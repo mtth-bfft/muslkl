@@ -1,0 +1,9 @@
+[submodule "sgx-musl"]
+	path = sgx-musl
+	url = git@sereca.cloudandheat.com:sereca/sgx-musl.git
+[submodule "lkl"]
+	path = lkl
+	url = https://github.com/lkl/linux.git
+[submodule "host-musl"]
+	path = host-musl
+	url = git://git.musl-libc.org/musl
