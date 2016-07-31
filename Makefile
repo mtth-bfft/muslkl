@@ -17,6 +17,7 @@ TESTS_SRC ?= $(sort $(wildcard $(TESTS)/*.c))
 TESTS_OBJ ?= $(addprefix $(TESTS_BUILD)/, $(notdir $(TESTS_SRC:.c=)))
 LKL ?= $(ROOT_DIR)/lkl
 LKL_BUILD ?= ${BUILD_DIR}/lkl
+LKL_LIB ?= ${LKL_BUILD}/lib/liblkl.a
 HOST_MUSL ?= $(ROOT_DIR)/host-musl
 HOST_MUSL_BUILD ?= $(BUILD_DIR)/host-musl
 HOST_MUSL_CC ?= ${HOST_MUSL_BUILD}/bin/musl-gcc
@@ -31,7 +32,7 @@ SGX_MUSL_CC ?= ${SGX_MUSL_BUILD}/bin/sgxmusl-gcc
 #DEBUG ?= true
 #CFLAGS_ALL ?= -std=c11 -Wall -Wextra -Werror
 #ifeq ($(DEBUG),true)
-#	CFLAGS_ALL += -ggdb3 -O0
+#	CFLAGS_ALL += -ggdb3 -O0 -rdynamic
 #else
 #	CFLAGS_ALL += -O2
 #endif
@@ -40,12 +41,12 @@ SGX_MUSL_CC ?= ${SGX_MUSL_BUILD}/bin/sgxmusl-gcc
 # Actual targets
 #
 
-all: ${HOST_MUSL_CC} lkl
+all: ${SGX_MUSL_CC}
 
 ${BUILD_DIR} ${TESTS_BUILD} ${LKL_BUILD} ${HOST_MUSL_BUILD} ${SGX_MUSL_BUILD}:
 	@mkdir -p $@
 
-
+#FIXME: add CFLAGS="-fPIC" to host_musl too?
 ${HOST_MUSL_CC}: ${HOST_MUSL_BUILD}
 	cd ${HOST_MUSL}; [ -f config.mak ] || ./configure \
 		--prefix=${HOST_MUSL_BUILD} \
@@ -53,17 +54,21 @@ ${HOST_MUSL_CC}: ${HOST_MUSL_BUILD}
 		--disable-optimize \
 		--disable-shared
 	+${MAKE} -C ${HOST_MUSL} install
+	ln -fs ${LINUX_HEADERS_INC}/linux/ ${HOST_MUSL_BUILD}/include/
+	ln -fs ${LINUX_HEADERS_INC}/asm/ ${HOST_MUSL_BUILD}/include/
+	ln -fs ${LINUX_HEADERS_INC}/asm-generic/ ${HOST_MUSL_BUILD}/include/
 
-${SGX_MUSL_CC}: ${SGX_MUSL_BUILD}
+${SGX_MUSL_CC}: ${LKL_LIB} ${SGX_MUSL_BUILD}
 	cd ${SGX_MUSL}; [ -f config.mak ] || ./configure \
 		--prefix=${SGX_MUSL_BUILD} \
+		--lklheaderdir=${LKL_BUILD}/include/ \
+		--lkllib=${LKL_LIB} \
 		--enable-debug \
 		--disable-optimize \
 		--disable-shared
 	+${MAKE} -C ${SGX_MUSL} install
-	ln -fs ${LINUX_HEADERS_INC}/linux/ ${SGX_MUSL_BUILD}/include/
-	ln -fs ${LINUX_HEADERS_INC}/asm/ ${SGX_MUSL_BUILD}/include/
-	ln -fs ${LINUX_HEADERS_INC}/asm-generic/ ${SGX_MUSL_BUILD}/include/
+
+${LKL_LIB}: lkl
 
 ${TESTS_BUILD}/%: ${TESTS}/%.c ${TESTS_BUILD} ${SGX_MUSL_CC}
 	${SGX_MUSL_CC} ${CFLAGS} -o $@ $< ${LDFLAGS}
@@ -71,11 +76,16 @@ ${TESTS_BUILD}/%: ${TESTS}/%.c ${TESTS_BUILD} ${SGX_MUSL_CC}
 .PHONY: host-musl sgx-musl lkl tests clean
 
 host-musl: ${HOST_MUSL_CC}
+
 sgx-musl: ${SGX_MUSL_CC}
-lkl: ${SGX_MUSL_CC} ${LKL_BUILD}
-	+${MAKE} V=1 CC="${SGX_MUSL_CC}" -C ${LKL}/tools/lkl liblkl.a
-	+${MAKE} V=1 CC="${SGX_MUSL_CC}" -C ${LKL}/tools/lkl DESTDIR=${LKL_BUILD} PREFIX="" headers_install
-	+${MAKE} V=1 CC="${SGX_MUSL_CC}" -C ${LKL}/tools/lkl DESTDIR=${LKL_BUILD} PREFIX="" libraries_install
+
+lkl: ${HOST_MUSL_CC} ${LKL_BUILD}
+	+DESTDIR=${LKL_BUILD} ${MAKE} -C ${LKL}/tools/lkl CC="${HOST_MUSL_CC}" PREFIX="" \
+		ALL_LIBRARIES=liblkl.a libraries_install
+	+DESTDIR=${LKL_BUILD} ${MAKE} -C ${LKL}/tools/lkl CC="${HOST_MUSL_CC}" PREFIX="" \
+		headers_install
+	# Bugfix, prefix symbol that collides with musl's one
+	sed -i 's/struct ipc_perm/struct lkl_ipc_perm/' ${LKL_BUILD}/include/lkl/linux/ipc.h
 
 tests: $(TESTS_OBJ)
 	@for test in $(TESTS_OBJ); do \
