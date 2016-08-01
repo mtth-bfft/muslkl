@@ -37,6 +37,9 @@ SGX_MUSL_CC ?= ${SGX_MUSL_BUILD}/bin/sgxmusl-gcc
 #	CFLAGS_ALL += -O2
 #endif
 
+TESTS_CFLAGS ?= -std=c99 -Wall -Wextra -Werror -ggdb3 -O0 -rdynamic -I${LKL_BUILD}/include/
+TESTS_LDFLAGS ?=
+
 #
 # Actual targets
 #
@@ -71,7 +74,7 @@ ${SGX_MUSL_CC}: ${LKL_LIB} ${SGX_MUSL_BUILD}
 ${LKL_LIB}: lkl
 
 ${TESTS_BUILD}/%: ${TESTS}/%.c ${TESTS_BUILD} ${SGX_MUSL_CC}
-	${SGX_MUSL_CC} ${CFLAGS} -o $@ $< ${LDFLAGS}
+	${SGX_MUSL_CC} ${TESTS_CFLAGS} -o $@ $< ${TESTS_LDFLAGS}
 
 .PHONY: host-musl sgx-musl lkl tests clean
 
@@ -85,13 +88,36 @@ lkl: ${HOST_MUSL_CC} ${LKL_BUILD}
 	+DESTDIR=${LKL_BUILD} ${MAKE} -C ${LKL}/tools/lkl CC="${HOST_MUSL_CC}" PREFIX="" \
 		headers_install
 	# Bugfix, prefix symbol that collides with musl's one
-	sed -i 's/struct ipc_perm/struct lkl_ipc_perm/' ${LKL_BUILD}/include/lkl/linux/ipc.h
+	find ${LKL_BUILD}/include/ -type f -exec sed -i 's/struct ipc_perm/struct lkl_ipc_perm/' {} \;
 
 tests: $(TESTS_OBJ)
-	@for test in $(TESTS_OBJ); do \
-		echo " [*] $$test :"; \
-		($$test && echo "     OK") || echo "     FAILED"; \
-	done
+	${MAKE} -j1 testrun
+
+testrun:
+	@printf "    [*] 01-compiler: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/01-compiler; \
+		[ $$? -eq 42 ] && echo "OK"
+	@printf "    [*] 02-lkl-host-print: "
+	@RES=$$(MUSL_NOLKL=1 ${TESTS_BUILD}/02-lkl-host-print); \
+		[ $$? -eq 0 -a $$RES = "OK" ] && echo "OK"
+	@printf "    [*] 03-lkl-host-panic: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/03-lkl-host-panic >/dev/null 2>&1; \
+		[ $$? -ne 0 ] && echo "OK"
+	@printf "    [*] 04-lkl-host-mem: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/04-lkl-host-mem; \
+		[ $$? -eq 0 ] && echo "OK"
+	@printf "    [*] 05-lkl-host-thread: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/05-lkl-host-thread; \
+		[ $$? -eq 0 ] && echo "OK"
+	@printf "    [*] 06-lkl-host-semaphore: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/06-lkl-host-semaphore; \
+		[ $$? -eq 0 ] && echo "OK"
+	@printf "    [*] 07-lkl-host-mutex: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/07-lkl-host-mutex; \
+		[ $$? -eq 0 ] && echo "OK
+	@printf "    [*] 08-lkl-host-tls: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/08-lkl-host-tls; \
+		[ $$? -eq 0 ] && echo "OK"
 
 clean:
 	rm -rf ${BUILD_DIR}
