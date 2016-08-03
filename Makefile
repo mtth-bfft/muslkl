@@ -36,13 +36,13 @@ TESTS_LDFLAGS ?=
 # Actual targets
 #
 
-all: ${SGX_MUSL_CC}
+all: sgx-musl tests
 
 ${BUILD_DIR} ${TESTS_BUILD} ${LKL_BUILD} ${HOST_MUSL_BUILD} ${SGX_MUSL_BUILD}:
 	@mkdir -p $@
 
 #FIXME: add CFLAGS="-fPIC" to host_musl too?
-${HOST_MUSL_CC}: ${HOST_MUSL_BUILD}
+host-musl: submodules ${HOST_MUSL_BUILD}
 	cd ${HOST_MUSL}; [ -f config.mak ] || ./configure \
 		--prefix=${HOST_MUSL_BUILD} \
 		--enable-debug \
@@ -53,7 +53,7 @@ ${HOST_MUSL_CC}: ${HOST_MUSL_BUILD}
 	ln -fs ${LINUX_HEADERS_INC}/asm/ ${HOST_MUSL_BUILD}/include/
 	ln -fs ${LINUX_HEADERS_INC}/asm-generic/ ${HOST_MUSL_BUILD}/include/
 
-${SGX_MUSL_CC}: ${LKL_LIB} ${SGX_MUSL_BUILD}
+sgx-musl: submodules lkl ${SGX_MUSL_BUILD}
 	cd ${SGX_MUSL}; [ -f config.mak ] || ./configure \
 		--prefix=${SGX_MUSL_BUILD} \
 		--lklheaderdir=${LKL_BUILD}/include/ \
@@ -63,24 +63,22 @@ ${SGX_MUSL_CC}: ${LKL_LIB} ${SGX_MUSL_BUILD}
 		--disable-shared
 	+${MAKE} -C ${SGX_MUSL} install
 
-${LKL_LIB}: lkl
-
-${TESTS_BUILD}/%: ${TESTS}/%.c ${TESTS_BUILD} ${SGX_MUSL_CC}
-	${SGX_MUSL_CC} ${TESTS_CFLAGS} -o $@ $< ${TESTS_LDFLAGS}
-
-.PHONY: host-musl sgx-musl lkl tests clean
-
-host-musl: ${HOST_MUSL_CC}
-
-sgx-musl: ${SGX_MUSL_CC}
-
-lkl: ${HOST_MUSL_CC} ${LKL_BUILD}
+lkl: submodules host-musl ${LKL_BUILD}
 	+DESTDIR=${LKL_BUILD} ${MAKE} -C ${LKL}/tools/lkl CC="${HOST_MUSL_CC}" PREFIX="" \
 		ALL_LIBRARIES=liblkl.a libraries_install
 	+DESTDIR=${LKL_BUILD} ${MAKE} -C ${LKL}/tools/lkl CC="${HOST_MUSL_CC}" PREFIX="" \
 		headers_install
 	# Bugfix, prefix symbol that collides with musl's one
 	find ${LKL_BUILD}/include/ -type f -exec sed -i 's/struct ipc_perm/struct lkl_ipc_perm/' {} \;
+
+${TESTS_BUILD}/%: ${TESTS}/%.c sgx-musl ${TESTS_BUILD}
+	${SGX_MUSL_CC} ${TESTS_CFLAGS} -o $@ $< ${TESTS_LDFLAGS}
+
+.PHONY: submodules host-musl sgx-musl lkl tests testrun clean
+
+submodules:
+	git submodule init
+	git submodule update
 
 tests: $(TESTS_OBJ)
 	${MAKE} -j1 testrun
