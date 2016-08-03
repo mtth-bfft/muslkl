@@ -26,7 +26,7 @@ void secondary_exit(void* arg) {
 
 	long tid = lkl_host_ops.gettid();
 	if (tid == 0 || tid == main_thread_tid)
-		fprintf(stderr, "Warning: child thread has tid %ld, main has %ld ",
+		fprintf(stderr, "WARN: child thread has tid %ld, main has %ld ",
 			tid, main_thread_tid);
 
 	// Cannot use wait()/sleep() operations

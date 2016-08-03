@@ -29,15 +29,7 @@ SGX_MUSL_CC ?= ${SGX_MUSL_BUILD}/bin/sgxmusl-gcc
 # Configuration flags
 #
 
-#DEBUG ?= true
-#CFLAGS_ALL ?= -std=c11 -Wall -Wextra -Werror
-#ifeq ($(DEBUG),true)
-#	CFLAGS_ALL += -ggdb3 -O0 -rdynamic
-#else
-#	CFLAGS_ALL += -O2
-#endif
-
-TESTS_CFLAGS ?= -std=c99 -Wall -Wextra -Werror -ggdb3 -O0 -rdynamic -I${LKL_BUILD}/include/
+TESTS_CFLAGS ?= -std=c11 -Wall -Wextra -Werror -ggdb3 -O0 -rdynamic -I${LKL_BUILD}/include/
 TESTS_LDFLAGS ?=
 
 #
@@ -94,30 +86,47 @@ tests: $(TESTS_OBJ)
 	${MAKE} -j1 testrun
 
 testrun:
+	@rm -f /tmp/encl-lib*
 	@printf "    [*] 01-compiler: "
 	@MUSL_NOLKL=1 ${TESTS_BUILD}/01-compiler; \
 		[ $$? -eq 42 ] && echo "OK"
-	@printf "    [*] 02-lkl-host-print: "
-	@RES=$$(MUSL_NOLKL=1 ${TESTS_BUILD}/02-lkl-host-print); \
-		[ $$? -eq 0 -a $$RES = "OK" ] && echo "OK"
-	@printf "    [*] 03-lkl-host-panic: "
-	@MUSL_NOLKL=1 ${TESTS_BUILD}/03-lkl-host-panic >/dev/null 2>&1; \
+	@printf "    [*] 02-pthreads: "
+	@MUSL_NOLKL=1 MUSL_ETHREADS=2 MUSL_STHREADS=2 ${TESTS_BUILD}/02-pthreads >/dev/null; \
+		[ $$? -eq 0 ] && echo "OK"
+	@printf "    [*] 03-pthreads-sleep: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/03-pthreads-sleep >/dev/null; \
+		[ $$? -eq 0 ] && echo "OK"
+#	@printf "    [*] 04-lthreads: "
+#	@MUSL_NOLKL=1 ${TESTS_BUILD}/04-lthreads; \
+#		[ $$? -eq 0 ] && echo "OK"
+	@printf "    [*] 05-lkl-host-print: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/05-lkl-host-print 2>&1 | grep -qi ok; \
+		[ $$? -eq 0 ] && echo "OK"
+	@printf "    [*] 06-lkl-host-panic: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/06-lkl-host-panic >/dev/null 2>&1; \
 		[ $$? -ne 0 ] && echo "OK"
-	@printf "    [*] 04-lkl-host-mem: "
-	@MUSL_NOLKL=1 ${TESTS_BUILD}/04-lkl-host-mem; \
+	@printf "    [*] 07-lkl-host-mem: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/07-lkl-host-mem >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
-	@printf "    [*] 05-lkl-host-thread: "
-	@MUSL_NOLKL=1 ${TESTS_BUILD}/05-lkl-host-thread; \
+	@printf "    [*] 08-lkl-host-thread: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/08-lkl-host-thread >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
-	@printf "    [*] 06-lkl-host-semaphore: "
-	@MUSL_NOLKL=1 ${TESTS_BUILD}/06-lkl-host-semaphore; \
+	@printf "    [*] 09-lkl-host-tls: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/09-lkl-host-tls >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
-	@printf "    [*] 07-lkl-host-mutex: "
-	@MUSL_NOLKL=1 ${TESTS_BUILD}/07-lkl-host-mutex; \
-		[ $$? -eq 0 ] && echo "OK
-	@printf "    [*] 08-lkl-host-tls: "
-	@MUSL_NOLKL=1 ${TESTS_BUILD}/08-lkl-host-tls; \
+	@printf "    [*] 10-lkl-host-mutex: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/10-lkl-host-mutex >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
+	@printf "    [*] 11-lkl-host-semaphore: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/11-lkl-host-semaphore >/dev/null; \
+		[ $$? -eq 0 ] && echo "OK"
+	@printf "    [*] 12-lkl-host-time: "
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/12-lkl-host-time >/dev/null; \
+		[ $$? -eq 0 ] && echo "OK"
+	@printf "    [*] 13-lkl-host-timer: "
+	@MUSL_NOLKL=1 MUSL_ETHREADS=2 MUSL_STHREADS=2 ${TESTS_BUILD}/13-lkl-host-timer >/dev/null; \
+		[ $$? -eq 0 ] && echo "OK"
+	@rm -f /tmp/encl-lib*
 
 clean:
 	rm -rf ${BUILD_DIR}

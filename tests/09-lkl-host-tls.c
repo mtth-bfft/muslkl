@@ -15,15 +15,18 @@ static unsigned int key2 = 0;
 
 void secondary(void* arg) {
 	UNUSED(arg);
-	lkl_host_ops.tls_set(key1, VAL1_2);
-	do {
-		arg = lkl_host_ops.tls_get(key2);
-		if (arg == NULL) {
-			fprintf(stderr, "Second tls_get(%d) returned NULL\n", key2);
-			exit(6);
-		}
-	} while (arg != VAL2_2);
-	lkl_host_ops.tls_set(key1, VAL1_1);
+	int res = lkl_host_ops.tls_set(key1, VAL1_2);
+	if (res != 0) {
+		fprintf(stderr, "Failed tls_set() in secondary thread, code %d\n",
+			res);
+		exit(res);
+	}
+	arg = lkl_host_ops.tls_get(key2);
+	if (arg != VAL1_2) {
+		fprintf(stderr, "tls_get(%u) returned %p in secondary thread\n",
+			key2, arg);
+		exit(2);
+	}
 }
 
 int main() {
@@ -33,15 +36,13 @@ int main() {
 		fprintf(stderr, "Failed first tls_alloc, returned %d\n", res);
 		return res;
 	}
-	if (key1 == 0)
-		fprintf(stderr, "Warning: null TLS first key ");
 	res = lkl_host_ops.tls_alloc(&key2);
 	if (res != 0) {
 		fprintf(stderr, "Failed second tls_alloc, returned %d\n", res);
 		return res;
 	}
-	if (key2 == 0)
-		fprintf(stderr, "Warning: TLS keys %d and %d ", key1, key2);
+	if (key1 == key2)
+		fprintf(stderr, "WARN: broken tls_alloc(), only 1 key %u ", key1);
 
 	// Check tls_set and tls_get in the same thread
 	res = lkl_host_ops.tls_set(key1, VAL1_1);
@@ -72,27 +73,11 @@ int main() {
 		return 3;
 	}
 
-	do {
-		val = lkl_host_ops.tls_get(key1);
-		if (val == NULL) {
-			fprintf(stderr, "First tls_get(%d) returned NULL\n", key1);
-			return 4;
-		}
-	} while (val != VAL1_2);
-
-	res = lkl_host_ops.tls_set(key2, VAL2_2);
-	if (res != 0) {
-		fprintf(stderr, "Second tls_set failed, returned %d\n", res);
-		return res;
+	val = lkl_host_ops.tls_get(key1);
+	if (val != VAL1_1) {
+		fprintf(stderr, "TLS value modified by another thread\n");
+		return 4;
 	}
-
-	do {
-		val = lkl_host_ops.tls_get(key1);
-		if (val == NULL) {
-			fprintf(stderr, "First tls_get(%d) returned NULL\n", key1);
-			return 5;
-		}
-	} while (val != VAL1_1);
 
 	// Check tls_free
 	res = lkl_host_ops.tls_free(key1);
