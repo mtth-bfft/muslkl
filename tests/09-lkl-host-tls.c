@@ -23,7 +23,7 @@ void secondary(void* arg) {
 	}
 	arg = lkl_host_ops.tls_get(key2);
 	if (arg != VAL1_2) {
-		fprintf(stderr, "tls_get(%u) returned %p in secondary thread\n",
+		fprintf(stderr, "WARN: tls_get(%u) returned %p in thread 2 ",
 			key2, arg);
 		exit(2);
 	}

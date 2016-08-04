@@ -84,7 +84,6 @@ tests: $(TESTS_OBJ)
 	${MAKE} -j1 testrun
 
 testrun:
-	@rm -f /tmp/encl-lib*
 	@printf "    [*] 01-compiler: "
 	@MUSL_NOLKL=1 ${TESTS_BUILD}/01-compiler; \
 		[ $$? -eq 42 ] && echo "OK"
@@ -103,6 +102,7 @@ testrun:
 	@printf "    [*] 06-lkl-host-panic: "
 	@MUSL_NOLKL=1 ${TESTS_BUILD}/06-lkl-host-panic >/dev/null 2>&1; \
 		[ $$? -ne 0 ] && echo "OK"
+	@rm -f /tmp/encl-lib-*
 	@printf "    [*] 07-lkl-host-mem: "
 	@MUSL_NOLKL=1 ${TESTS_BUILD}/07-lkl-host-mem >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
@@ -124,7 +124,6 @@ testrun:
 	@printf "    [*] 13-lkl-host-timer: "
 	@MUSL_NOLKL=1 MUSL_ETHREADS=2 MUSL_STHREADS=2 ${TESTS_BUILD}/13-lkl-host-timer >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
-	@rm -f /tmp/encl-lib*
 
 clean:
 	rm -rf ${BUILD_DIR}
