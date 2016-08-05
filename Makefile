@@ -94,7 +94,7 @@ testrun:
 	@MUSL_NOLKL=1 ${TESTS_BUILD}/03-pthreads-sleep >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
 #	@printf "    [*] 04-lthreads: "
-#	@MUSL_NOLKL=1 ${TESTS_BUILD}/04-lthreads; \
+#	@MUSL_NOLKL=1 MUSL_ETHREADS=6 MUSL_STHREADS=6 ${TESTS_BUILD}/04-lthreads; \
 #		[ $$? -eq 0 ] && echo "OK"
 	@printf "    [*] 05-lkl-host-print: "
 	@MUSL_NOLKL=1 ${TESTS_BUILD}/05-lkl-host-print 2>&1 | grep -qi ok; \
@@ -122,8 +122,11 @@ testrun:
 	@MUSL_NOLKL=1 ${TESTS_BUILD}/12-lkl-host-time >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
 	@printf "    [*] 13-lkl-host-timer: "
-	@MUSL_NOLKL=1 MUSL_ETHREADS=2 MUSL_STHREADS=2 ${TESTS_BUILD}/13-lkl-host-timer >/dev/null; \
+	@MUSL_NOLKL=1 MUSL_ETHREADS=4 MUSL_STHREADS=4 ${TESTS_BUILD}/13-lkl-host-timer >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
+	@printf "    [*] 14-lkl-boot: "
+	@MUSL_NOLKL=0 MUSL_ETHREADS=2 MUSL_STHREADS=2 ${TESTS_BUILD}/14-lkl-boot >/dev/null; \
+		[ $$? -eq 42 ] && echo "OK"
 
 clean:
 	rm -rf ${BUILD_DIR}
