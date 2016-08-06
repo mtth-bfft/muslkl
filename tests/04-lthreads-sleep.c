@@ -14,6 +14,8 @@
 // lthread has millisecond accuracy at best
 #define SLEEP_DRIFT_ALLOWED_NS (1000*1000)
 
+volatile int join_barrier_reached = 0;
+
 // lthread headers are not exported properly for now
 void lthread_sleep(uint64_t msecs);
 
@@ -44,7 +46,7 @@ void* secondary_sleep(void* arg) {
 	unsigned long long start_ns = timestamp_now_ns();
 
 	check_state(2);
-	printf("Testing lthread_sleep(%d)...\n", SLEEP_TIME_S);
+	printf("Testing lthread_sleep(%d ms)...\n", SLEEP_TIME_MS);
 	lthread_sleep(SLEEP_TIME_MS);
 	check_state(3);
 
@@ -57,6 +59,7 @@ void* secondary_sleep(void* arg) {
 			(long long)SLEEP_TIME_S, diff_ns, drift);
 	}
 
+	join_barrier_reached = 1;
 	return NULL;
 }
 
@@ -70,11 +73,16 @@ int main() {
 		return res;
 	}
 	check_state(2);
-	printf("Main thread alive while sleeping\n");
-	res = pthread_join(thread1, NULL);
+	printf("Main thread alive, waiting for secondary wakeup\n");
+	/*res = pthread_join(thread1, NULL);
 	if (res != 0) {
 		fprintf(stderr, "Error: pthread_join() returned %d\n", res);
 		return res;
+	}*/
+	while (!join_barrier_reached) {
+		printf(".");
+		for(volatile int i = 0; i < 100000; i++) { }
+		lthread_sleep(0); // yield
 	}
 
 	check_state(4);

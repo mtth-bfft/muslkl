@@ -2,6 +2,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <lkl.h>
 #include <lkl_host.h>
 
@@ -19,26 +20,29 @@ static unsigned long long timestamp_ns_now() {
 	return (ts.tv_sec * (1000*1000*1000UL) + ts.tv_nsec);
 }
 
-static char* format_ns_time(unsigned long long timestamp_ns) {
-	static char buffer[30] = {0};
+static void format_ns_time(unsigned long long timestamp_ns, char* buf, size_t len) {
 	time_t secs_part = (time_t)(timestamp_ns / (1000*1000*1000));
 	unsigned long ns_part = timestamp_ns % (1000*1000*1000);
-	struct tm *time = localtime((time_t*)&secs_part);
-	strftime(buffer, sizeof(buffer), "%d/%m/%Y %H:%M:%S.", time);
-	snprintf(buffer+20, sizeof(buffer)-20, "%09ld", ns_part);
-	return buffer;
+	struct tm *time = gmtime((time_t*)&secs_part);
+	strftime(buf, len, "%d/%m/%Y %H:%M:%S", time);
+	snprintf(buf+strlen(buf), len-strlen(buf), ".%09ld", ns_part);
 }
 
 int main() {
 	// Check time() compared to host datetime
 	unsigned long long real_t = timestamp_ns_now();
 	unsigned long long t = lkl_host_ops.time();
-	printf("%s ", format_ns_time(t));
+	char real_t_buf[30] = {0};
+	char t_buf[30] = {0};
+	format_ns_time(real_t, real_t_buf, sizeof(real_t_buf));
+	format_ns_time(t, t_buf, sizeof(t_buf));
 
 	if (t < (real_t - ALLOWED_CLOCK_DELTA_NS))
-		fprintf(stderr, "WARN: in past (real=%s?) ", format_ns_time(real_t));
+		fprintf(stderr, "WARN: in past (real=%s? / guest=%s)) ",
+			real_t_buf, t_buf);
 	else if(t > (real_t + ALLOWED_CLOCK_DELTA_NS))
-		fprintf(stderr, "WARN: in future (real=%s?) ", format_ns_time(real_t));
+		fprintf(stderr, "WARN: in future (real=%s? / guest=%s) ",
+			real_t_buf, t_buf);
 
 	// Check that time() is monotonic and actually increases
 	unsigned long long ns_elapsed = 0;
