@@ -26,6 +26,8 @@ unsigned long long timestamp_now_ns() {
 }
 
 void check_state(int newstate) {
+	static int lock = 0;
+	while (__sync_lock_test_and_set(&lock, 1) == 1) { }
 	static int state = 0;
 	if (newstate != state && newstate != (state+1)) {
 		fprintf(stderr, "State %d reached from state %d\n",
@@ -33,6 +35,7 @@ void check_state(int newstate) {
 		exit(1);
 	}
 	state = newstate;
+	__sync_lock_release(&lock);
 }
 
 void* secondary_sleep(void* arg) {

@@ -90,7 +90,7 @@ tests: $(TESTS_OBJ)
 
 testrun:
 	@printf "    [*] 01-compiler: "
-	@MUSL_NOLKL=1 ${TESTS_BUILD}/01-compiler; \
+	@MUSL_NOLKL=1 ${TESTS_BUILD}/01-compiler >/dev/null; \
 		[ $$? -eq 42 ] && echo "OK"
 	@printf "    [*] 02-pthreads: "
 	@MUSL_NOLKL=1 MUSL_ETHREADS=2 MUSL_STHREADS=2 ${TESTS_BUILD}/02-pthreads >/dev/null; \
@@ -132,6 +132,9 @@ testrun:
 	@printf "    [*] 19-lkl-boot: "
 	@MUSL_NOLKL=0 MUSL_ETHREADS=2 MUSL_STHREADS=2 ${TESTS_BUILD}/19-lkl-boot >/dev/null; \
 		[ $$? -eq 42 ] && echo "OK"
+	@printf "    [*] 20-lkl-disk: "
+	@MUSL_NOLKL=0 MUSL_ETHREADS=2 MUSL_STHREADS=2 MUSL_HD=tests/20-lkl-disk.img:ro ${TESTS_BUILD}/20-lkl-disk; \
+		[ $$? -eq 0 ] && echo "OK"
 
 clean:
 	rm -rf ${BUILD_DIR}

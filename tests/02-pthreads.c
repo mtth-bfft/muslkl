@@ -16,13 +16,16 @@ static volatile int busy_wait_join_detached = 0;
 static volatile int canceled_but_still_running = 0;
 
 void check_state(int newstate) {
+	static int lock = 0;
 	static int state = 0;
+	while (__sync_lock_test_and_set(&lock, 1) == 1) { }
 	if (newstate != state && newstate != (state+1)) {
 		fprintf(stderr, "State %d reached from state %d\n",
 			newstate, state);
 		exit(4);
 	}
 	state = newstate;
+	__sync_lock_release(&lock);
 }
 
 void* secondary_exit(void *arg) {
