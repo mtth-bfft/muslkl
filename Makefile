@@ -133,7 +133,10 @@ testrun:
 	@MUSL_NOLKL=0 MUSL_ETHREADS=2 MUSL_STHREADS=2 ${TESTS_BUILD}/19-lkl-boot >/dev/null; \
 		[ $$? -eq 42 ] && echo "OK"
 	@printf "    [*] 20-lkl-disk: "
-	@MUSL_NOLKL=0 MUSL_ETHREADS=2 MUSL_STHREADS=2 MUSL_HD=tests/20-lkl-disk.img:ro ${TESTS_BUILD}/20-lkl-disk; \
+	@MUSL_NOLKL=0 MUSL_ETHREADS=2 MUSL_STHREADS=2 MUSL_HD=tests/20-lkl-disk.img:ro ${TESTS_BUILD}/20-lkl-disk >/dev/null; \
+		[ $$? -eq 0 ] && echo "OK"
+	@printf "    [*] 21-lkl-net: "
+	@(ping -c10 -i0.5 -W2 -DO -n 10.0.10.10 &) && MUSL_NOLKL=0 MUSL_ETHREADS=4 MUSL_STHREADS=4 MUSL_TAP=tap0 MUSL_IP4=10.0.10.10 MUSL_GW4=10.0.10.10 ${TESTS_BUILD}/21-lkl-net >/dev/null;  \
 		[ $$? -eq 0 ] && echo "OK"
 
 clean:

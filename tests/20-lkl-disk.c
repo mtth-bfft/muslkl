@@ -8,16 +8,26 @@
 
 #define MAXPATH 8192
 
-char* pretty_print_size(unsigned long bytes) {
+char* pretty_print_size(unsigned long bytes)
+{
 	static const char* suffixes[] = { "B", "KiB", "MiB", "GiB" };
 	static char buffer[32];
 	int unit = 0;
-	int count = bytes;
-	while (count > 0) {
+	double count = bytes;
+	while (count > 1024 && unit < 3) {
 		unit++;
-		count /= 1024;
+		count /= 1024.0;
 	}
-	snprintf(buffer, sizeof(buffer), "%d %s", count, suffixes[unit]);
+	snprintf(buffer, sizeof(buffer), "%.1f %s", count, suffixes[unit]);
+	return buffer;
+}
+
+char* pretty_print_mode(unsigned int m)
+{
+	static char buffer[32] = {0};
+	strncpy(buffer, "rwxrwxrwx", sizeof(buffer));
+	if (m == 0)
+		return buffer;
 	return buffer;
 }
 
@@ -35,14 +45,13 @@ void list_dir(const char* path, int depth)
 	}
 	struct dirent *item;
 	char filepath[MAXPATH] = {0};
-	strncpy(filepath, path, sizeof(filepath));
+	strncpy(filepath, dirpath, sizeof(filepath));
 	char *name = filepath + strlen(filepath);
 	int buflen = sizeof(filepath) - strlen(filepath);
 	while ((item = readdir(d)) != NULL) {
 		char *type = "?";
-		//int mode = 0;
-		struct stat stat;
-		if (strncmp(item->d_name, "..", 2) == 0 || strncmp(item->d_name, ".", 1) == 0)
+		if (strncmp(item->d_name, "..", 2) == 0 ||
+			strncmp(item->d_name, ".", 1) == 0)
 			continue;
 		strncpy(name, item->d_name, buflen);
 
@@ -58,17 +67,23 @@ void list_dir(const char* path, int depth)
 			type = "b";
 		else if (item->d_type == DT_DIR)
 			type = "d";
-		else if (item->d_type == DT_LNK) {
+		else if (item->d_type == DT_LNK)
 			type = "l";
-		}
+
+		struct stat stat;
 		int res = lstat(filepath, &stat);
-		if (res != 0) {
-			
+		if (res == 0) {
+			printf("%s%s %ld:%ld %s\t%s\n", type,
+				pretty_print_mode(stat.st_mode),
+				(long)stat.st_uid, (long)stat.st_gid,
+				pretty_print_size(stat.st_size), filepath);
+			if (item->d_type == DT_DIR &&
+				strncmp(filepath, "/sys", 4) != 0)
+				list_dir(filepath, depth+1);
+		} else {
+			printf("%s????????? ?:? %s\t%s\n", type,
+				pretty_print_size(stat.st_size), filepath);
 		}
-		printf("%s %ld:%ld %s\t%s\n", type, (long)stat.st_uid,
-			(long)stat.st_gid, pretty_print_size(stat.st_size), filepath);
-		if (item->d_type == DT_DIR)
-			list_dir(filepath, depth+1);
 	}
 	closedir(d);
 }
@@ -84,12 +99,13 @@ int main() {
 		perror("fopen()");
 		return 2;
 	}
-	char buffer[3];
-	if (fgets(buffer, 1, f) == NULL) {
+	char buffer[3] = {0};
+	if (fgets(buffer, 2, f) == NULL) {
 		fprintf(stderr, "Error: unable to read /test.txt\n");
 		perror("fgets()");
 		return 3;
 	}
+	printf(" [*] Read %s\n", buffer);
 	fclose(f);
-	return 0;
+	return (strncmp(buffer, "OK", sizeof(buffer)) == 0);
 }
