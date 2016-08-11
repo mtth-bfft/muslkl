@@ -1,12 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
 #define _DEFAULT_SOURCE
 #define _BSD_SOURCE
 #include <dirent.h>
 #include <sys/stat.h>
 #include <string.h>
 
-#define MAXPATH 8192
+#define MAXPATH 100
 
 char* pretty_print_size(unsigned long bytes)
 {
@@ -78,7 +80,7 @@ void list_dir(const char* path, int depth)
 				(long)stat.st_uid, (long)stat.st_gid,
 				pretty_print_size(stat.st_size), filepath);
 			if (item->d_type == DT_DIR &&
-				strncmp(filepath, "/sys", 4) != 0)
+				strncmp("/sys", filepath, 4) != 0)
 				list_dir(filepath, depth+1);
 		} else {
 			printf("%s????????? ?:? %s\t%s\n", type,
@@ -92,20 +94,28 @@ int main() {
 	printf(" [*] Enclave file list:\n");
 	list_dir("/", 0);
 
-	printf(" [*] Looking for test.txt\n");
+	printf(" [*] Reading test.txt using stdio\n");
 	FILE *f = fopen("/test.txt", "r");
 	if (f == NULL) {
 		fprintf(stderr, "Error: file /test.txt not found\n");
 		perror("fopen()");
 		return 2;
 	}
-	char buffer[3] = {0};
-	if (fgets(buffer, 2, f) == NULL) {
-		fprintf(stderr, "Error: unable to read /test.txt\n");
+	char buffer[20] = {0};
+	char *res2 = fgets(buffer, sizeof(buffer), f);
+	if (res2 == NULL) {
+		fprintf(stderr, "Error: fgets(/test.txt) returned NULL\n");
 		perror("fgets()");
-		return 3;
+		return -1;
 	}
-	printf(" [*] Read %s\n", buffer);
-	fclose(f);
-	return (strncmp(buffer, "OK", sizeof(buffer)) == 0);
+	if (strcmp("Hello, World!\n", buffer) != 0)
+		fprintf(stderr, "WARN: read wrong string from /test.txt\n");
+	printf(" [*] Read: '%s'\n", buffer);
+	int ret = fclose(f);
+	if (ret != 0) {
+		fprintf(stderr, "Error: close(/test.txt) returned %d\n", ret);
+		perror("fclose()");
+		return ret;
+	}
+	return 0;
 }

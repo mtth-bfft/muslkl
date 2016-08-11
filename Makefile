@@ -9,6 +9,8 @@ MAKEFLAGS += --no-print-directory
 #TODO: use autoconf or auto detect
 LINUX_HEADERS_INC ?= /usr/include
 
+FORCE_SUBMODULES_VERSION ?= false
+
 ROOT_DIR ?= $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 BUILD_DIR ?= $(ROOT_DIR)/build
 TESTS ?= $(ROOT_DIR)/tests
@@ -31,7 +33,7 @@ SGX_MUSL_CC ?= ${SGX_MUSL_BUILD}/bin/sgxmusl-gcc
 # Configuration flags
 #
 
-TESTS_CFLAGS ?= -std=c11 -Wall -Wextra -Werror -ggdb3 -O0 -rdynamic -I${LKL_BUILD}/include/
+TESTS_CFLAGS ?= -std=c11 -Wall -Wextra -Werror -ggdb3 -O0 -rdynamic -I${LKL_BUILD}/include/ -isystem ${SGX_MUSL}/src/internal/
 TESTS_LDFLAGS ?=
 
 #
@@ -82,13 +84,13 @@ ${TESTS_BUILD}/%: ${TESTS}/%.c sgx-musl ${TESTS_BUILD}
 .PHONY: submodules host-musl sgx-musl lkl tests testrun clean
 
 submodules:
-	git submodule init
-	git submodule update
+	[ "$(FORCE_SUBMODULES_VERSION)" = "true" ] || git submodule init
+	[ "$(FORCE_SUBMODULES_VERSION)" = "true" ] || git submodule update
 
 tests: $(TESTS_OBJ)
-	${MAKE} -j1 testrun
+	${MAKE} -j1 runtests
 
-testrun:
+runtests:
 	@printf "    [*] 01-compiler: "
 	@MUSL_NOLKL=1 ${TESTS_BUILD}/01-compiler >/dev/null; \
 		[ $$? -eq 42 ] && echo "OK"
@@ -130,14 +132,15 @@ testrun:
 	@MUSL_NOLKL=1 MUSL_ETHREADS=4 MUSL_STHREADS=4 ${TESTS_BUILD}/18-lkl-host-timer >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
 	@printf "    [*] 19-lkl-boot: "
-	@MUSL_NOLKL=0 MUSL_ETHREADS=2 MUSL_STHREADS=2 ${TESTS_BUILD}/19-lkl-boot >/dev/null; \
+	@MUSL_NOLKL=0 MUSL_ETHREADS=2 MUSL_STHREADS=2 MUSL_TAP="" MUSL_HD="" ${TESTS_BUILD}/19-lkl-boot >/dev/null; \
 		[ $$? -eq 42 ] && echo "OK"
 	@printf "    [*] 20-lkl-disk: "
-	@MUSL_NOLKL=0 MUSL_ETHREADS=2 MUSL_STHREADS=2 MUSL_HD=tests/20-lkl-disk.img:ro ${TESTS_BUILD}/20-lkl-disk >/dev/null; \
+	@MUSL_NOLKL=0 MUSL_ETHREADS=2 MUSL_STHREADS=2 MUSL_TAP="" MUSL_HD=${TESTS}/20-lkl-disk.img:ro ${TESTS_BUILD}/20-lkl-disk >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
 	@printf "    [*] 21-lkl-net: "
-	@(ping -c10 -i0.5 -W2 -DO -n 10.0.10.10 &) && MUSL_NOLKL=0 MUSL_ETHREADS=4 MUSL_STHREADS=4 MUSL_TAP=tap0 MUSL_IP4=10.0.10.10 MUSL_GW4=10.0.10.10 ${TESTS_BUILD}/21-lkl-net >/dev/null;  \
+	@(MUSL_NOLKL=0 MUSL_ETHREADS=4 MUSL_STHREADS=4 MUSL_HD="" MUSL_TAP=tap0 MUSL_IP4=10.0.10.10 MUSL_GW4=10.0.10.10 ${TESTS_BUILD}/21-lkl-net >/dev/null &) && (ping -W1 -c15 -i0.2 -D -O -q -n 10.0.10.10 >/dev/null);  \
 		[ $$? -eq 0 ] && echo "OK"
+	@rm /tmp/encl-lib-*
 
 clean:
 	rm -rf ${BUILD_DIR}

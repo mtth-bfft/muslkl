@@ -9,38 +9,6 @@
 #define _GNU_SOURCE
 #include <net/if.h>
 
-// From linux/if_link.h. No portable solution found at this time.
-typedef unsigned int __u32;
-struct rtnl_link_stats {
-	__u32   rx_packets;             /* total packets received       */
-	__u32   tx_packets;             /* total packets transmitted    */
-	__u32   rx_bytes;               /* total bytes received         */
-	__u32   tx_bytes;               /* total bytes transmitted      */
-	__u32   rx_errors;              /* bad packets received         */
-	__u32   tx_errors;              /* packet transmit problems     */
-	__u32   rx_dropped;             /* no space in linux buffers    */
-	__u32   tx_dropped;             /* no space available in linux  */
-	__u32   multicast;              /* multicast packets received   */
-	__u32   collisions;
-	/* detailed rx_errors: */
-	__u32   rx_length_errors;
-	__u32   rx_over_errors;         /* receiver ring buff overflow  */
-	__u32   rx_crc_errors;          /* recved pkt with crc error    */
-	__u32   rx_frame_errors;        /* recv'd frame alignment error */
-	__u32   rx_fifo_errors;         /* recv'r fifo overrun          */
-	__u32   rx_missed_errors;       /* receiver missed packet       */
-	/* detailed tx_errors */
-	__u32   tx_aborted_errors;
-	__u32   tx_carrier_errors;
-	__u32   tx_fifo_errors;
-	__u32   tx_heartbeat_errors;
-	__u32   tx_window_errors;
-	/* for cslip etc */
-	__u32   rx_compressed;
-	__u32   tx_compressed;
-	__u32   rx_nohandler;           /* dropped, no handler found    */
-};
-
 char* ip_to_string(struct sockaddr *addr)
 {
 	static char buf[INET6_ADDRSTRLEN] = {0};
@@ -67,13 +35,14 @@ void print_iff_flags(unsigned int flags)
 	if (flags & IFF_LOWER_UP) printf(" IFF_LOWER_UP");
 }
 
-int main() {
+void print_iff_list()
+{
 	struct ifaddrs *ifaddrs = NULL;
 	int res = getifaddrs(&ifaddrs);
 	if (res != 0) {
 		fprintf(stderr, "Error: could not get interface list\n");
 		perror("getifaddrs()");
-		return res;
+		exit(1);
 	}
 
 	printf(" [*] Interface list:\n");
@@ -104,24 +73,24 @@ int main() {
 	}
 	if (!loopback_found) {
 		fprintf(stderr, "Error: no loopback interface\n");
-		exit(1);
+		exit(2);
 	} else if (lo_ipv4 == NULL) {
 		fprintf(stderr, "Error: no address on loopback\n");
-		exit(2);
+		exit(3);
 	}
 	if (eth0_packet == NULL) {
 		fprintf(stderr, "Error: no eth0 interface\n");
-		exit(3);
+		exit(4);
 	} else if(eth0_ipv4 == NULL) {
 		fprintf(stderr, "Error: no address on eth0\n");
-		exit(4);
+		exit(5);
 	}
-
-	//struct rtnl_link_stats *stats = (struct rtnl_link_stats*)eth0_packet->ifa_data;
-	//printf("RX=%lld TX=%lld\n", (long long)stats->rx_bytes, (long long)stats->tx_bytes);
-
 	freeifaddrs(ifaddrs);
+}
 
-	while(getchar() != '\n') { }
+int main() {
+	print_iff_list();
+	sleep(1);
 	return 0;
 }
+
