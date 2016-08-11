@@ -90,7 +90,7 @@ void print_iff_list()
 
 int main() {
 	print_iff_list();
-	sleep(1);
+	sleep(2);
 	return 0;
 }
 
