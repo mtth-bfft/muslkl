@@ -13,7 +13,7 @@ ifeq ("$(wildcard $(SGX_MUSL_CC))","")
 $(error "Please run `make sgx-musl` in the main directory to actually have a compiler to test")
 endif
 
-${TESTS_BUILD}/%: %.c
+${TESTS_BUILD}/%: %.c ${TESTS_BUILD}
 	${SGX_MUSL_CC} ${CFLAGS} -o $@ $< ${LDFLAGS}
 
 tests: $(TESTS_OBJ)
@@ -70,22 +70,48 @@ serial_tests:
 	@(MUSL_NOLKL=0 MUSL_ETHREADS=4 MUSL_STHREADS=4 MUSL_HD="" MUSL_TAP=tap0 MUSL_IP4=10.0.10.10 MUSL_GW4=10.0.10.254 ${TESTS_BUILD}/21-lkl-net >/dev/null &) && (ping -W1 -c15 -i0.2 -D -O -q -n 10.0.10.10 >/dev/null); \
 		[ $$? -eq 0 ] && echo "OK"
 
-libevent: submodules
-	cd ${LIBEVENT}; [ -f configure ] || ./autogen.sh
-	MUSL_NOLKL=0 MUSL_ETHREADS=6 MUSL_STHREADS=6 MUSL_HD="" MUSL_TAP="" CC=${SGX_MUSL_CC} ./configure \
+.PHONY: submodules libevent memcached clean
+
+${LIBEVENT_BUILD} ${MEMCACHED_BUILD}:
+	@mkdir -p $@
+
+submodules:
+	[ "$(FORCE_SUBMODULES_VERSION)" = "true" ] || git submodule init ${LIBEVENT} ${MEMCACHED}
+	[ "$(FORCE_SUBMODULES_VERSION)" = "true" ] || git submodule update ${LIBEVENT} ${MEMCACHED}
+
+libevent: submodules ${LIBEVENT_BUILD}
+	cd ${LIBEVENT}; [ -f configure ] || CC=${SGX_MUSL_CC} ./autogen.sh
+	cd ${LIBEVENT}; MUSL_NOLKL=0 MUSL_ETHREADS=6 MUSL_STHREADS=6 MUSL_HD="" MUSL_TAP="" CC=${SGX_MUSL_CC} ./configure \
 		--disable-shared \
 		--disable-openssl \
 		--prefix=${LIBEVENT_BUILD}
+	#FIXME: autoconf fails to detect type sizes
+	sed  -i -e 's/EVENT__SIZEOF_INT $$/EVENT__SIZEOF_INT 4/' \
+		-e 's/EVENT__SIZEOF_LONG $$/EVENT__SIZEOF_LONG 8/' \
+		-e 's/EVENT__SIZEOF_LONG_LONG $$/EVENT__SIZEOF_LONG_LONG 8/' \
+		-e 's/EVENT__SIZEOF_OFF_T $$/EVENT__SIZEOF_OFF_T 8/' \
+		-e 's/EVENT__SIZEOF_PTHREAD_T $$/EVENT__SIZEOF_PTHREAD_T 8/' \
+		-e 's/EVENT__SIZEOF_SHORT $$/EVENT__SIZEOF_SHORT 2/' \
+		-e 's/EVENT__SIZEOF_SIZE_T $$/EVENT__SIZEOF_SIZE_T 8/' \
+		-e 's/EVENT__SIZEOF_VOID_P $$/EVENT__SIZEOF_VOID_P 8/' ${LIBEVENT}/include/event2/event-config.h
 	+${MAKE} -C ${LIBEVENT}
 	+${MAKE} -C ${LIBEVENT} install
 
-submodules:
-	[ "$(FORCE_SUBMODULES_VERSION)" = "true" ] || git submodule init ${LIBEVENT}
-	[ "$(FORCE_SUBMODULES_VERSION)" = "true" ] || git submodule update ${LIBEVENT}
+memcached: submodules libevent ${MEMCACHED_BUILD}
+	cd ${MEMCACHED}; [ -f configure ] || ./autogen.sh
+	cd ${MEMCACHED}; MUSL_NOLKL=0 MUSL_ETHREADS=6 MUSL_STHREADS=6 MUSL_HD="" MUSL_TAP="" CC=${SGX_MUSL_CC} ./configure \
+		--with-libevent=${LIBEVENT_BUILD} \
+		--mandir=/tmp \
+		--disable-coverage \
+		--prefix=${MEMCACHED_BUILD}
+	+${MAKE} -C ${MEMCACHED}
+	+${MAKE} -C ${MEMCACHED} install
 
-memcached:
-	cd tests/80-memcached; git checkout tags/1.4.25
-	cd tests/80-memcached; [ -f configure ] || ./autogen.sh
-	cd tests/80-memcached; MUSL_ETHREADS=6 MUSL_STHREADS=6 CC=${SGX_MUSL_CC} ./configure --prefix=${TESTS_BUILD}/80-memcached/ --with-libevent=${TESTS_BUILD}/80-libevent/ --mandir=/tmp --disable-coverage
-	cd tests/80-memcached; make
-	cd tests/80-memcached; make install
+clean:
+	${MAKE} -C ${LIBEVENT} clean || /bin/true
+	rm -f ${LIBEVENT}/Makefile
+	rm -f ${LIBEVENT}/configure
+	${MAKE} -C ${MEMCACHED} clean || /bin/true
+	rm -f ${MEMCACHED}/Makefile
+	rm -f ${MEMCACHED}/configure
+

@@ -10,3 +10,6 @@
 [submodule "libevent"]
 	path = tests/80-memcached/libevent
 	url = https://github.com/libevent/libevent.git
+[submodule "memcached"]
+	path = tests/80-memcached/memcached
+	url = https://github.com/memcached/memcached.git
