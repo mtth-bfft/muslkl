@@ -9,11 +9,10 @@ default: tests
 
 all: tests memcached
 
-ifeq ("$(wildcard $(SGX_MUSL_CC))","")
-$(error "Please run `make sgx-musl` in the main directory to actually have a compiler to test")
-endif
+${SGX_MUSL_CC}:
+	${MAKE} -C .. ${SGX_MUSL_CC}
 
-${TESTS_BUILD}/%: %.c ${TESTS_BUILD}
+${TESTS_BUILD}/%: %.c ${TESTS_BUILD} ${SGX_MUSL_CC}
 	${SGX_MUSL_CC} ${CFLAGS} -o $@ $< ${LDFLAGS}
 
 tests: $(TESTS_OBJ)
@@ -72,7 +71,7 @@ serial_tests:
 
 .PHONY: submodules libevent memcached clean
 
-${LIBEVENT_BUILD} ${MEMCACHED_BUILD}:
+${LIBEVENT_BUILD} ${MEMCACHED_BUILD} ${TESTS_BUILD}:
 	@mkdir -p $@
 
 submodules:

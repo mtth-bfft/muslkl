@@ -30,3 +30,11 @@ SGX_MUSL_CC ?= ${SGX_MUSL_BUILD}/bin/sgxmusl-gcc
 CFLAGS ?= -std=c11 -Wall -Wextra -Werror -ggdb3 -O0 -rdynamic -I${LKL_BUILD}/include/ -isystem ${SGX_MUSL}/src/internal/
 LDFLAGS ?=
 
+DEBUG ?= true
+
+MUSL_CONFIGURE_OPTS ?=
+MUSL_CFLAGS ?= -fPIC
+ifeq ($(DEBUG),true)
+	MUSL_CONFIGURE_OPTS += --disable-optimize --enable-debug
+	MUSL_CFLAGS += -g -O0 -DDEBUG
+endif

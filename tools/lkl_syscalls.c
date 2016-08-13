@@ -4,14 +4,24 @@
 
 #define str(s) #s
 #define EXPORT_LKL_SYSCALL(name) \
+	printf("#undef  __NR_" str(name) "\n"); \
+	printf("#undef   SYS_" str(name) "\n"); \
 	printf("#define __NR_" str(name) " %d\n", (__lkl__NR_ ## name)); \
-	printf("#define SYS_" str(name) " __NR_" str(name) "\n");
+	printf("#define  SYS_" str(name) " __NR_" str(name) "\n"); \
+	printf("__LKL_SYSCALL(" str(name) ")\n");
 
 #define EXPORT_HOST_SYSCALL(name) \
+	printf("#undef  __NR_" str(name) "\n"); \
+	printf("#undef   SYS_" str(name) "\n"); \
 	printf("#define __NR_" str(name) " %d\n", (__lkl__NR_arch_specific_syscall + __COUNTER__)); \
-	printf("#define SYS_" str(name) " __NR_" str(name) "\n");
+	printf("#define  SYS_" str(name) " __NR_" str(name) "\n"); \
+	printf("__LKL_SYSCALL(" str(name) ")\n");
 
 int main() {
+	printf("// Generated using tools/lkl_syscalls.c , changes will be overwritten\n\n");
+	printf("#ifndef __LKL_SYSCALL\n");
+	printf("#define __LKL_SYSCALL(name) \n");
+	printf("#endif\n\n");
 	EXPORT_LKL_SYSCALL(accept)
 	EXPORT_LKL_SYSCALL(accept4)
 	EXPORT_LKL_SYSCALL(access)

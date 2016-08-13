@@ -5,10 +5,9 @@ default: all
 all: sgx-musl tests
 
 host-musl: | submodules ${HOST_MUSL_BUILD}
-	cd ${HOST_MUSL}; [ -f config.mak ] || CFLAGS="-fPIC" ./configure \
+	cd ${HOST_MUSL}; [ -f config.mak ] || CFLAGS="$(MUSL_CFLAGS)" ./configure \
+		$(MUSL_CONFIGURE_OPTS) \
 		--prefix=${HOST_MUSL_BUILD} \
-		--enable-debug \
-		--disable-optimize \
 		--disable-shared
 	+${MAKE} -C ${HOST_MUSL} install
 	ln -fs ${LINUX_HEADERS_INC}/linux/ ${HOST_MUSL_BUILD}/include/
@@ -27,12 +26,11 @@ lkl: host-musl | submodules ${LKL_BUILD} ${TOOLS_BUILD}
 	${TOOLS_BUILD}/lkl_syscalls > ${LKL_BUILD}/include/lkl/syscall.h
 
 sgx-musl: lkl | submodules ${SGX_MUSL_BUILD}
-	cd ${SGX_MUSL}; [ -f config.mak ] || ./configure \
+	cd ${SGX_MUSL}; [ -f config.mak ] || CFLAGS="$(MUSL_CFLAGS)" ./configure \
+		$(MUSL_CONFIGURE_OPTS) \
 		--prefix=${SGX_MUSL_BUILD} \
 		--lklheaderdir=${LKL_BUILD}/include/ \
 		--lkllib=${LKL_LIB} \
-		--enable-debug \
-		--disable-optimize \
 		--disable-shared
 	+${MAKE} -C ${SGX_MUSL} install
 
@@ -54,3 +52,4 @@ clean:
 	+${MAKE} -C ${SGX_MUSL} distclean
 	+${MAKE} -C ${LKL} clean
 	+${MAKE} -C ${LKL}/tools/lkl clean
+	+${MAKE} -C ${TESTS} clean
