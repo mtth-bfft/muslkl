@@ -20,16 +20,23 @@ char* pretty_print_size(unsigned long bytes)
 		unit++;
 		count /= 1024.0;
 	}
-	snprintf(buffer, sizeof(buffer), "%.1f %s", count, suffixes[unit]);
+	snprintf(buffer, sizeof(buffer), "%.1f%s", count, suffixes[unit]);
 	return buffer;
 }
 
 char* pretty_print_mode(unsigned int m)
 {
 	static char buffer[32] = {0};
-	strncpy(buffer, "rwxrwxrwx", sizeof(buffer));
-	if (m == 0)
-		return buffer;
+	strncpy(buffer, "---------", sizeof(buffer));
+	if (m & S_IRUSR) buffer[0] = 'r';
+	if (m & S_IWUSR) buffer[1] = 'w';
+	if (m & S_IXUSR) buffer[2] = 'x';
+	if (m & S_IRGRP) buffer[3] = 'r';
+	if (m & S_IWGRP) buffer[4] = 'w';
+	if (m & S_IXGRP) buffer[5] = 'x';
+	if (m & S_IROTH) buffer[6] = 'r';
+	if (m & S_IWOTH) buffer[7] = 'w';
+	if (m & S_IXOTH) buffer[8] = 'x';
 	return buffer;
 }
 
