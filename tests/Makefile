@@ -107,6 +107,7 @@ memcached: submodules libevent ${MEMCACHED_BUILD}
 	+${MAKE} -C ${MEMCACHED} install
 
 clean:
+	rm -f $(TESTS_OBJ)
 	${MAKE} -C ${LIBEVENT} clean || /bin/true
 	rm -f ${LIBEVENT}/Makefile
 	rm -f ${LIBEVENT}/configure

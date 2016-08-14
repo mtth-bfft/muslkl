@@ -23,7 +23,7 @@ lkl: host-musl | submodules ${LKL_BUILD} ${TOOLS_BUILD}
 	# Bugfix, prefix symbol that collides with musl's one
 	find ${LKL_BUILD}/include/ -type f -exec sed -i 's/struct ipc_perm/struct lkl_ipc_perm/' {} \;
 	+${MAKE} headers_install -C ${LKL} ARCH=lkl INSTALL_HDR_PATH=${LKL_BUILD}/
-	${HOST_MUSL_CC} ${CFLAGS} -o ${TOOLS_BUILD}/lkl_syscalls ${TOOLS}/lkl_syscalls.c ${LDFLAGS}
+	${HOST_MUSL_CC} ${CFLAGS} -I${LKL_BUILD}/include/ -o ${TOOLS_BUILD}/lkl_syscalls ${TOOLS}/lkl_syscalls.c ${LDFLAGS}
 	${TOOLS_BUILD}/lkl_syscalls > ${LKL_BUILD}/include/lkl/syscall.h
 
 sgx-musl: lkl | submodules ${SGX_MUSL_BUILD}

@@ -27,7 +27,7 @@ SGX_MUSL ?= $(ROOT_DIR)/sgx-musl
 SGX_MUSL_BUILD ?= ${BUILD_DIR}/sgx-musl
 SGX_MUSL_CC ?= ${SGX_MUSL_BUILD}/bin/sgxmusl-gcc
 
-CFLAGS ?= -std=c11 -Wall -Wextra -Werror -ggdb3 -O0 -rdynamic -I${LKL_BUILD}/include/ -isystem ${SGX_MUSL}/src/internal/
+CFLAGS ?= -std=c11 -Wall -Wextra -Werror -ggdb3 -O0 -rdynamic -isystem ${SGX_MUSL}/src/internal/
 LDFLAGS ?=
 
 DEBUG ?= true

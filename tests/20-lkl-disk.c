@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <time.h>
 
 #define MAXPATH 100
 
@@ -82,15 +83,18 @@ void list_dir(const char* path, int depth)
 		struct stat stat;
 		int res = lstat(filepath, &stat);
 		if (res == 0) {
-			printf("%s%s %ld:%ld %s\t%s\n", type,
-				pretty_print_mode(stat.st_mode),
+			printf("%s%s %ld:%ld  %.19s  %.19s  %.19s  %s\t%s\n",
+				type, pretty_print_mode(stat.st_mode),
 				(long)stat.st_uid, (long)stat.st_gid,
+				ctime(&stat.st_atime), ctime(&stat.st_mtime),
+				ctime(&stat.st_ctime),
 				pretty_print_size(stat.st_size), filepath);
 			if (item->d_type == DT_DIR &&
 				strncmp("/sys", filepath, 4) != 0)
 				list_dir(filepath, depth+1);
 		} else {
-			printf("%s????????? ?:? %s\t%s\n", type,
+			printf("%s????????? ?:?  %.19s  %.19s  %.19s  %s\t%s\n",
+				type, "?", "?", "?",
 				pretty_print_size(stat.st_size), filepath);
 		}
 	}
@@ -124,5 +128,6 @@ int main() {
 		perror("fclose()");
 		return ret;
 	}
+
 	return 0;
 }
