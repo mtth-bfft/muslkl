@@ -71,7 +71,7 @@ serial_tests:
 
 .PHONY: submodules libevent memcached clean
 
-${LIBEVENT_BUILD} ${MEMCACHED_BUILD} ${TESTS_BUILD}:
+${LIBEVENT_BUILD} ${MEMCACHED_BUILD} ${NGINX_BUILD} ${TESTS_BUILD}:
 	@mkdir -p $@
 
 submodules:
@@ -105,6 +105,27 @@ memcached: submodules libevent ${MEMCACHED_BUILD}
 		--prefix=${MEMCACHED_BUILD}
 	+${MAKE} -C ${MEMCACHED}
 	+${MAKE} -C ${MEMCACHED} install
+
+nginx: submodules ${NGINX_BUILD}
+	cd ${NGINX}; MUSL_NOLKL=0 MUSL_ETHREADS=4 MUSL_STHREADS=4 CC=${SGX_MUSL_CC} ./auto/configure \
+		--prefix=${NGINX_BUILD}/ \
+		--conf-path=/data/conf/nginx.conf \
+		--sbin-path=/none \
+		--pid-path=/tmp/nginx.pid \
+		--lock-path=/tmp/nginx.lock \
+		--error-log-path=/tmp/error.log \
+		--http-log-path=/tmp/access.log \
+		--http-client-body-temp-path=/tmp/client-body \
+		--http-proxy-temp-path=/tmp/proxy \
+		--http-fastcgi-temp-path=/tmp/fastcgi \
+		--http-fastcgi-temp-path=/tmp/fastcgi \
+		--http-uwsgi-temp-path=/tmp/uwsgi \
+		--http-scgi-temp-path=/tmp/scgi \
+		--without-http_gzip_module \
+		--without-http_rewrite_module \
+		--with-ipv6 \
+		--with-debug
+	cd ${NGINX}; make
 
 clean:
 	rm -f $(TESTS_OBJ)
