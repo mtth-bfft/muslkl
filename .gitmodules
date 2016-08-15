@@ -1,6 +1,6 @@
 [submodule "sgx-musl"]
 	path = sgx-musl
-	url = git@gitlab.doc.ic.ac.uk:mb1815/muslkl-sgx.git
+	url = git@sereca.cloudandheat.com:matthieu.buffet/muslkl-sgx.git
 [submodule "lkl"]
 	path = lkl
 	url = https://github.com/lkl/linux.git
