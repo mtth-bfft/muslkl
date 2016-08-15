@@ -66,7 +66,8 @@ serial_tests:
 	@MUSL_NOLKL=0 MUSL_ETHREADS=2 MUSL_STHREADS=2 MUSL_TAP="" MUSL_HD=${TESTS}/20-lkl-disk.img:ro ${TESTS_BUILD}/20-lkl-disk >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
 	@printf "    [*] 21-lkl-net: "
-	@(MUSL_NOLKL=0 MUSL_ETHREADS=4 MUSL_STHREADS=4 MUSL_HD="" MUSL_TAP=tap0 MUSL_IP4=10.0.10.10 MUSL_GW4=10.0.10.254 ${TESTS_BUILD}/21-lkl-net >/dev/null &) && (ping -W1 -c15 -i0.2 -D -O -q -n 10.0.10.10 >/dev/null); \
+	@(MUSL_NOLKL=0 MUSL_ETHREADS=4 MUSL_STHREADS=4 MUSL_HD="" MUSL_TAP=tap0 MUSL_IP4=10.0.1.1 MUSL_GW4=10.0.1.254 MUSL_MASK4=24 \
+		${TESTS_BUILD}/21-lkl-net >/dev/null &) && (ping -W1 -c15 -i0.2 -D -O -q -n 10.0.1.1 >/dev/null); \
 		[ $$? -eq 0 ] && echo "OK"
 
 .PHONY: submodules libevent memcached clean

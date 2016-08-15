@@ -24,7 +24,9 @@ lkl: host-musl | submodules ${LKL_BUILD} ${TOOLS_BUILD}
 	find ${LKL_BUILD}/include/ -type f -exec sed -i 's/struct ipc_perm/struct lkl_ipc_perm/' {} \;
 	+${MAKE} headers_install -C ${LKL} ARCH=lkl INSTALL_HDR_PATH=${LKL_BUILD}/
 	${HOST_MUSL_CC} ${CFLAGS} -I${LKL_BUILD}/include/ -o ${TOOLS_BUILD}/lkl_syscalls ${TOOLS}/lkl_syscalls.c ${LDFLAGS}
-	${TOOLS_BUILD}/lkl_syscalls > ${LKL_BUILD}/include/lkl/syscall.h
+	${HOST_MUSL_CC} ${CFLAGS} -I${LKL_BUILD}/include/ -o ${TOOLS_BUILD}/lkl_bits ${TOOLS}/lkl_bits.c ${LDFLAGS}
+	${TOOLS_BUILD}/lkl_syscalls > ${LKL_BUILD}/include/lkl/syscalls.h
+	${TOOLS_BUILD}/lkl_bits > ${LKL_BUILD}/include/lkl/bits.h
 
 sgx-musl: lkl | submodules ${SGX_MUSL_BUILD}
 	cd ${SGX_MUSL}; [ -f config.mak ] || CFLAGS="$(MUSL_CFLAGS)" ./configure \
