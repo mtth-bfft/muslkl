@@ -23,13 +23,13 @@ serial_tests:
 	@MUSL_NOLKL=1 ${TESTS_BUILD}/01-compiler >/dev/null; \
 		[ $$? -eq 42 ] && echo "OK"
 	@printf "    [*] 02-pthreads: "
-	@MUSL_NOLKL=1 MUSL_ETHREADS=2 MUSL_STHREADS=2 ${TESTS_BUILD}/02-pthreads >/dev/null; \
+	@MUSL_NOLKL=1 ${MUSLKLSGX_STD_RUN_OPTS} ${TESTS_BUILD}/02-pthreads >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
 	@printf "    [*] 03-pthreads-sleep: "
 	@MUSL_NOLKL=1 ${TESTS_BUILD}/03-pthreads-sleep >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
 #	@printf "    [*] 04-lthreads-sleep: "
-#	@MUSL_NOLKL=1 MUSL_ETHREADS=6 MUSL_STHREADS=6 ${TESTS_BUILD}/04-lthreads-sleep; \
+#	@MUSL_NOLKL=1 ${MUSLKLSGX_STD_RUN_OPTS} ${TESTS_BUILD}/04-lthreads-sleep; \
 #		[ $$? -eq 0 ] && echo "OK"
 	@printf "    [*] 10-lkl-host-print: "
 	@MUSL_NOLKL=1 ${TESTS_BUILD}/10-lkl-host-print 2>&1 | grep -qi ok; \
@@ -57,16 +57,16 @@ serial_tests:
 	@MUSL_NOLKL=1 ${TESTS_BUILD}/17-lkl-host-time >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
 	@printf "    [*] 18-lkl-host-timer: "
-	@MUSL_NOLKL=1 MUSL_ETHREADS=4 MUSL_STHREADS=4 ${TESTS_BUILD}/18-lkl-host-timer >/dev/null; \
+	@MUSL_NOLKL=1 ${MUSLKLSGX_STD_RUN_OPTS} ${TESTS_BUILD}/18-lkl-host-timer >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
 	@printf "    [*] 19-lkl-boot: "
-	@MUSL_NOLKL=0 MUSL_ETHREADS=2 MUSL_STHREADS=2 MUSL_TAP="" MUSL_HD="" ${TESTS_BUILD}/19-lkl-boot >/dev/null; \
+	@MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_TAP="" MUSL_HD="" ${TESTS_BUILD}/19-lkl-boot >/dev/null; \
 		[ $$? -eq 42 ] && echo "OK"
 	@printf "    [*] 20-lkl-disk: "
-	@MUSL_NOLKL=0 MUSL_ETHREADS=2 MUSL_STHREADS=2 MUSL_TAP="" MUSL_HD=${TESTS}/20-lkl-disk.img:ro ${TESTS_BUILD}/20-lkl-disk >/dev/null; \
+	@MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_TAP="" MUSL_HD=${TESTS}/20-lkl-disk.img:ro ${TESTS_BUILD}/20-lkl-disk >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
 	@printf "    [*] 21-lkl-net: "
-	@(MUSL_NOLKL=0 MUSL_ETHREADS=4 MUSL_STHREADS=4 MUSL_HD="" MUSL_TAP=tap0 MUSL_IP4=10.0.1.1 MUSL_GW4=10.0.1.254 MUSL_MASK4=24 \
+	@(MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_TAP=tap0 MUSL_IP4=10.0.1.1 MUSL_GW4=10.0.1.254 MUSL_MASK4=24 MUSL_HD="" \
 		${TESTS_BUILD}/21-lkl-net >/dev/null &) && (ping -W1 -c15 -i0.2 -D -O -q -n 10.0.1.1 >/dev/null); \
 		[ $$? -eq 0 ] && echo "OK"
 
@@ -81,11 +81,11 @@ submodules:
 
 libevent: submodules ${LIBEVENT_BUILD}
 	cd ${LIBEVENT}; [ -f configure ] || CC=${SGX_MUSL_CC} ./autogen.sh
-	cd ${LIBEVENT}; MUSL_NOLKL=0 MUSL_ETHREADS=6 MUSL_STHREADS=6 MUSL_HD="" MUSL_TAP="" CC=${SGX_MUSL_CC} ./configure \
+	cd ${LIBEVENT}; MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_HD="" MUSL_TAP="" CC=${SGX_MUSL_CC} ./configure \
 		--disable-shared \
 		--disable-openssl \
 		--prefix=${LIBEVENT_BUILD}
-	#FIXME: autoconf fails to detect type sizes
+	#FIXME: autoconf fails to detect type sizes. Hard-code them for x86_64 with a sed.
 	sed  -i -e 's/EVENT__SIZEOF_INT $$/EVENT__SIZEOF_INT 4/' \
 		-e 's/EVENT__SIZEOF_LONG $$/EVENT__SIZEOF_LONG 8/' \
 		-e 's/EVENT__SIZEOF_LONG_LONG $$/EVENT__SIZEOF_LONG_LONG 8/' \
@@ -99,7 +99,7 @@ libevent: submodules ${LIBEVENT_BUILD}
 
 memcached: submodules libevent ${MEMCACHED_BUILD}
 	cd ${MEMCACHED}; [ -f configure ] || ./autogen.sh
-	cd ${MEMCACHED}; MUSL_NOLKL=0 MUSL_ETHREADS=6 MUSL_STHREADS=6 MUSL_HD="" MUSL_TAP="" CC=${SGX_MUSL_CC} ./configure \
+	cd ${MEMCACHED}; MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_HD="" MUSL_TAP="" CC=${SGX_MUSL_CC} ./configure \
 		--with-libevent=${LIBEVENT_BUILD} \
 		--mandir=/tmp \
 		--disable-coverage \
@@ -108,7 +108,8 @@ memcached: submodules libevent ${MEMCACHED_BUILD}
 	+${MAKE} -C ${MEMCACHED} install
 
 nginx: submodules ${NGINX_BUILD}
-	cd ${NGINX}; MUSL_NOLKL=0 MUSL_ETHREADS=4 MUSL_STHREADS=4 CC=${SGX_MUSL_CC} ./auto/configure \
+	cd ${NGINX}; MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_HD="" MUSL_TAP="" CC=${SGX_MUSL_CC} ./auto/configure \
+		${NGINX_CONFIGURE_OPTS} \
 		--prefix=${NGINX_BUILD}/ \
 		--conf-path=/data/conf/nginx.conf \
 		--sbin-path=/none \
@@ -124,8 +125,7 @@ nginx: submodules ${NGINX_BUILD}
 		--http-scgi-temp-path=/tmp/scgi \
 		--without-http_gzip_module \
 		--without-http_rewrite_module \
-		--with-ipv6 \
-		--with-debug
+		--with-ipv6
 	cd ${NGINX}; make
 
 clean:
@@ -136,4 +136,3 @@ clean:
 	${MAKE} -C ${MEMCACHED} clean || /bin/true
 	rm -f ${MEMCACHED}/Makefile
 	rm -f ${MEMCACHED}/configure
-

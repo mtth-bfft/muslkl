@@ -2,6 +2,8 @@
 .SUFFIXES:
 MAKEFLAGS += --no-print-directory
 
+MUSLKLSGX_STD_RUN_OPTS ?= MUSL_ETHREADS=4 MUSL_STHREADS=4
+
 #TODO: use autoconf or auto detect
 LINUX_HEADERS_INC ?= /usr/include
 
@@ -29,14 +31,20 @@ SGX_MUSL ?= $(ROOT_DIR)/sgx-musl
 SGX_MUSL_BUILD ?= ${BUILD_DIR}/sgx-musl
 SGX_MUSL_CC ?= ${SGX_MUSL_BUILD}/bin/sgxmusl-gcc
 
-CFLAGS ?= -std=c11 -Wall -Wextra -Werror -ggdb3 -O0 -rdynamic -isystem ${SGX_MUSL}/src/internal/
+CFLAGS ?= -std=c11 -Wall -Wextra -Werror -rdynamic -isystem ${SGX_MUSL}/src/internal/
 LDFLAGS ?=
 
-DEBUG ?= true
+DEBUG ?= false
 
 MUSL_CONFIGURE_OPTS ?=
 MUSL_CFLAGS ?= -fPIC
+NGINX_CONFIGURE_OPTS ?=
+
 ifeq ($(DEBUG),true)
 	MUSL_CONFIGURE_OPTS += --disable-optimize --enable-debug
 	MUSL_CFLAGS += -g -O0 -DDEBUG
+	NGINX_CONFIGURE_OPTS += --with-debug
+	CFLAGS += -ggdb3 -O0
+else
+	CFLAGS += -O3
 endif
