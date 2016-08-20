@@ -1,10 +1,16 @@
 include config.mak
 
-default: all
+.PHONY: host-musl lkl openssl sgx-musl tests tools clean
 
+default: all
+# Default is to build everything and run a basic test suite
 all: sgx-musl tests
 
-host-musl: | submodules ${HOST_MUSL_BUILD}
+tests: sgx-musl
+	+${MAKE} -C ${TESTS}
+
+# Vanilla Musl compiler
+host-musl ${HOST_MUSL_CC}: | ${HOST_MUSL}/.git ${HOST_MUSL_BUILD}
 	cd ${HOST_MUSL}; [ -f config.mak ] || CFLAGS="$(MUSL_CFLAGS)" ./configure \
 		$(MUSL_CONFIGURE_OPTS) \
 		--prefix=${HOST_MUSL_BUILD} \
@@ -14,45 +20,60 @@ host-musl: | submodules ${HOST_MUSL_BUILD}
 	ln -fs ${LINUX_HEADERS_INC}/asm/ ${HOST_MUSL_BUILD}/include/
 	ln -fs ${LINUX_HEADERS_INC}/asm-generic/ ${HOST_MUSL_BUILD}/include/
 
-lkl: host-musl | submodules ${LKL_BUILD} ${TOOLS_BUILD}
-	+DESTDIR=${LKL_BUILD} ${MAKE} -C ${LKL}/tools/lkl CC="${HOST_MUSL_CC}" PREFIX="" \
+# LKL's static library and include/ header directory
+lkl ${LIBLKL}: ${HOST_MUSL_CC} | ${LKL}/.git ${LKL_BUILD}
+	+DESTDIR=${LKL_BUILD} ${MAKE} -C ${LKL}/tools/lkl CC=${HOST_MUSL_CC} PREFIX="" \
 		ALL_LIBRARIES=liblkl.a libraries_install
-	+DESTDIR=${LKL_BUILD} ${MAKE} -C ${LKL}/tools/lkl CC="${HOST_MUSL_CC}" PREFIX="" \
+	+DESTDIR=${LKL_BUILD} ${MAKE} -C ${LKL}/tools/lkl CC=${HOST_MUSL_CC} PREFIX="" \
 		headers_install
 	#TODO: apply before makes, and to the entire ${LKL} folder?
 	# Bugfix, prefix symbol that collides with musl's one
 	find ${LKL_BUILD}/include/ -type f -exec sed -i 's/struct ipc_perm/struct lkl_ipc_perm/' {} \;
 	+${MAKE} headers_install -C ${LKL} ARCH=lkl INSTALL_HDR_PATH=${LKL_BUILD}/
-	${HOST_MUSL_CC} ${CFLAGS} -I${LKL_BUILD}/include/ -o ${TOOLS_BUILD}/lkl_syscalls ${TOOLS}/lkl_syscalls.c ${LDFLAGS}
-	${HOST_MUSL_CC} ${CFLAGS} -I${LKL_BUILD}/include/ -o ${TOOLS_BUILD}/lkl_bits ${TOOLS}/lkl_bits.c ${LDFLAGS}
-	${TOOLS_BUILD}/lkl_syscalls > ${LKL_BUILD}/include/lkl/syscalls.h
-	${TOOLS_BUILD}/lkl_bits > ${LKL_BUILD}/include/lkl/bits.h
 
-sgx-musl: lkl | submodules ${SGX_MUSL_BUILD}
+# OpenSSL's static library and include/ header directory
+openssl ${LIBCRYPTO}: ${HOST_MUSL_CC} | ${OPENSSL}/.git ${OPENSSL_BUILD}
+	cd ${OPENSSL}; [ -f Makefile ] || CC=${HOST_MUSL_CC} ./config \
+		--prefix=${OPENSSL_BUILD}/ \
+		--openssldir=${OPENSSL_BUILD}/openssl/ \
+		threads no-zlib no-shared
+	+${MAKE} CC=${HOST_MUSL_CC} -C ${OPENSSL} depend
+	+${MAKE} CC=${HOST_MUSL_CC} -C ${OPENSSL}
+	+${MAKE} CC=${HOST_MUSL_CC} -C ${OPENSSL} install
+
+tools: ${TOOLS_OBJ}
+
+# Generic tool rule (doesn't actually depend on lkl_lib, but on LKL headers)
+${TOOLS_BUILD}/%: ${TOOLS}/%.c ${HOST_MUSL_CC} ${LIBCRYPTO} ${LKL_LIB} | ${TOOLS_BUILD}
+	${HOST_MUSL_CC} ${MY_CFLAGS} -I${LKL_BUILD}/include/ -o $@ $< ${MY_LDFLAGS}
+
+# More headers required by SGX-Musl not exported by LKL, given by a custom tool's output
+${LKL_SGXMUSL_HEADERS}: ${LKL_BUILD}/include/lkl/%.h: ${TOOLS_BUILD}/lkl_%
+	$< > $@
+
+# LKL-SGX-Musl compiler
+sgx-musl ${SGX_MUSL_CC}: ${LIBLKL} ${LIBCRYPTO} ${LKL_SGXMUSL_HEADERS} | ${SGX_MUSL_BUILD}
 	cd ${SGX_MUSL}; [ -f config.mak ] || CFLAGS="$(MUSL_CFLAGS)" ./configure \
 		$(MUSL_CONFIGURE_OPTS) \
 		--prefix=${SGX_MUSL_BUILD} \
 		--lklheaderdir=${LKL_BUILD}/include/ \
-		--lkllib=${LKL_LIB} \
+		--lkllib=${LIBLKL} \
 		--disable-shared
 	+${MAKE} -C ${SGX_MUSL} install
 
-.PHONY: submodules host-musl sgx-musl lkl tests clean
-
-${BUILD_DIR} ${TOOLS_BUILD} ${LKL_BUILD} ${HOST_MUSL_BUILD} ${SGX_MUSL_BUILD}:
+# Build directories (one-shot after git clone or clean)
+${BUILD_DIR} ${TOOLS_BUILD} ${LKL_BUILD} ${HOST_MUSL_BUILD} ${SGX_MUSL_BUILD} ${OPENSSL_BUILD}:
 	@mkdir -p $@
 
-tests: sgx-musl
-	+${MAKE} -C ${TESTS} tests
-
-submodules:
-	[ "$(FORCE_SUBMODULES_VERSION)" = "true" ] || git submodule init ${LKL} ${HOST_MUSL} ${SGX_MUSL}
-	[ "$(FORCE_SUBMODULES_VERSION)" = "true" ] || git submodule update ${LKL} ${HOST_MUSL} ${SGX_MUSL}
+# Submodule initialisation (one-shot after git clone)
+${HOST_MUSL}/.git ${LKL}/.git ${OPENSSL}/.git ${SGX_MUSL}/.git:
+	[ "$(FORCE_SUBMODULES_VERSION)" = "true" ] || git submodule update --init $($@:.git=)
 
 clean:
 	rm -rf ${BUILD_DIR}
 	+${MAKE} -C ${HOST_MUSL} distclean
 	+${MAKE} -C ${SGX_MUSL} distclean
+	+${MAKE} -C ${OPENSSL} clean
 	+${MAKE} -C ${LKL} clean
 	+${MAKE} -C ${LKL}/tools/lkl clean
 	+${MAKE} -C ${TESTS} clean

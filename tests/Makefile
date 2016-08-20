@@ -1,20 +1,14 @@
 include ../config.mak
 
-TESTS_SRC ?= $(sort $(wildcard $(TESTS)/*.c))
-TESTS_OBJ ?= $(addprefix $(TESTS_BUILD)/, $(notdir $(TESTS_SRC:.c=)))
-
-.PHONY: default all tests runtests memcached
+.PHONY: default all tests memcached nginx clean
 
 default: tests
+all: tests memcached nginx
 
-all: tests memcached
+${TESTS_BUILD}/%: %.c ${SGX_MUSL_CC} | ${TESTS_BUILD}
+	${SGX_MUSL_CC} ${MY_CFLAGS} -o $@ $< ${MY_LDFLAGS}
 
-${SGX_MUSL_CC}:
-	${MAKE} -C .. ${SGX_MUSL_CC}
-
-${TESTS_BUILD}/%: %.c ${TESTS_BUILD} ${SGX_MUSL_CC}
-	${SGX_MUSL_CC} ${CFLAGS} -o $@ $< ${LDFLAGS}
-
+# Run tests (in a sub-target to prevent Make from parallelising different tests)
 tests: $(TESTS_OBJ)
 	@${MAKE} -j1 serial_tests
 
@@ -70,14 +64,12 @@ serial_tests:
 		${TESTS_BUILD}/21-lkl-net >/dev/null &) && (ping -W1 -c15 -i0.2 -D -O -q -n 10.0.1.1 >/dev/null); \
 		[ $$? -eq 0 ] && echo "OK"
 
-.PHONY: submodules libevent memcached clean
-
 ${LIBEVENT_BUILD} ${MEMCACHED_BUILD} ${NGINX_BUILD} ${TESTS_BUILD}:
 	@mkdir -p $@
 
-submodules:
-	[ "$(FORCE_SUBMODULES_VERSION)" = "true" ] || git submodule init ${LIBEVENT} ${MEMCACHED}
-	[ "$(FORCE_SUBMODULES_VERSION)" = "true" ] || git submodule update ${LIBEVENT} ${MEMCACHED}
+# Submodule initialisation (one-shot after git clone)
+${LIBEVENT}/.git ${MEMCACHED}/.git ${NGINX}/.git:
+	[ "$(FORCE_SUBMODULES_VERSION)" = "true" ] || git submodule update --init $($@:.git=)
 
 libevent: submodules ${LIBEVENT_BUILD}
 	cd ${LIBEVENT}; [ -f configure ] || CC=${SGX_MUSL_CC} ./autogen.sh

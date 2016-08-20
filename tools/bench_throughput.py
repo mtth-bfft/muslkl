@@ -25,7 +25,7 @@ def bench_throughputs(samples=sys.maxsize, duration=sys.maxsize,
             if errors >= maxerrors:
                 raise
             print(' [!] Iteration %d failed: %s\n%s' % \
-                (iteration, str(e), str(e)))
+                (iteration, str(type(e)), str(e)))
     print(' [*] Benchmark duration: %s (%d iterations)' % \
         (pretty_print_duration(time.time() - bench_start), iteration))
     return throughputs

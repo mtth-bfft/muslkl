@@ -16,3 +16,6 @@
 [submodule "nginx"]
 	path = tests/70-nginx
 	url = https://github.com/nginx/nginx.git
+[submodule "openssl"]
+	path = openssl
+	url = https://github.com/openssl/openssl.git
