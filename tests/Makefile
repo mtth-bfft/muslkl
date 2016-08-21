@@ -58,11 +58,16 @@ serial_tests:
 	@printf "    [*] 19-lkl-boot: "
 	@MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_TAP="" MUSL_HD="" ${TESTS_BUILD}/19-lkl-boot >/dev/null; \
 		[ $$? -eq 42 ] && echo "OK"
-	@printf "    [*] 20-lkl-disk: "
+	@printf "    [*] 20-lkl-disk: (plaintext) "
 	@cd ${TESTS}; tar -xvf 20-lkl-disk.tar.gz >/dev/null
 	@MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_TAP="" MUSL_HD=${TESTS}/20-lkl-disk.img ${TESTS_BUILD}/20-lkl-disk >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
-	@rm -f ${TESTS}/20-lkl-disk.img
+#	@printf "    [*] 20-lkl-disk: (encrypted) "
+#	@${TOOLS_BUILD}/disk_encrypt -e -k 000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F \
+#		-i ${TESTS}/20-lkl-disk.img -o ${TESTS}/20-lkl-disk-encrypted.img >/dev/null
+#	@MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_TAP="" MUSL_HD=${TESTS}/20-lkl-disk-encrypted.img ${TESTS_BUILD}/20-lkl-disk >/dev/null; \
+#		[ $$? -eq 0 ] && echo "OK"
+	@rm -f ${TESTS}/20-lkl-disk.img ${TESTS}/20-lkl-disk-encrypted.img
 	@printf "    [*] 21-lkl-net: "
 	@(MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_TAP=tap0 MUSL_IP4=10.0.1.1 MUSL_GW4=10.0.1.254 MUSL_MASK4=24 MUSL_HD="" \
 		${TESTS_BUILD}/21-lkl-net >/dev/null &) && (ping -W1 -c15 -i0.2 -D -O -q -n 10.0.1.1 >/dev/null); \

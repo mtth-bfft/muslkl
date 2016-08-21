@@ -6,7 +6,7 @@ default: all
 # Default is to build everything and run a basic test suite
 all: sgx-musl tests
 
-tests: sgx-musl
+tests: sgx-musl tools
 	+${MAKE} -C ${TESTS}
 
 # Vanilla Musl compiler
@@ -58,6 +58,8 @@ sgx-musl ${SGX_MUSL_CC}: ${LIBLKL} ${LIBCRYPTO} ${LKL_SGXMUSL_HEADERS} | ${SGX_M
 		--prefix=${SGX_MUSL_BUILD} \
 		--lklheaderdir=${LKL_BUILD}/include/ \
 		--lkllib=${LIBLKL} \
+		--opensslheaderdir=${OPENSSL_BUILD}/include/ \
+		--openssllib=${LIBCRYPTO} \
 		--disable-shared
 	+${MAKE} -C ${SGX_MUSL} install
 

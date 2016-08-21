@@ -214,7 +214,7 @@ int main(int argc, char* argv[])
 				res = errno;
 				break;
 			} else if (encrypting) {
-				fprintf(stderr, " [!] Last block was %d bytes,"
+				printf(" [*] Last block was %d bytes,"
 					" 0-padding to %d bytes\n", read,
 					(int)sector_size);
 				for (int i = read; i < sector_size; i++)
@@ -260,4 +260,3 @@ int main(int argc, char* argv[])
 		fclose(in);
 	return res;
 }
-
