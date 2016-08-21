@@ -6,10 +6,12 @@
 #define _BSD_SOURCE
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/vfs.h>
 #include <string.h>
 #include <time.h>
 
 #define MAXPATH 100
+#define BLOCKSIZE 1024
 
 char* pretty_print_size(unsigned long bytes)
 {
@@ -102,32 +104,82 @@ void list_dir(const char* path, int depth)
 }
 
 int main() {
+	char buffer[BLOCKSIZE] = {0};
+	FILE* f = fopen("/sys/class/block/vda/size", "r");
+	if (f == NULL) {
+		fprintf(stderr, "Error: unable to read disk size\n");
+		perror("fopen(/sys/class/block/vda/size)");
+		return 1;
+	} else {
+		fread(buffer, 1, 512, f);
+		fclose(f);
+		unsigned long bytes = strtoul(buffer, NULL, 10);
+		if (bytes == 0) {
+			fprintf(stderr, "Error: unable to detect disk size\n");
+			return 2;
+		}
+		printf(" [*] Detected disk size: %lu bytes\n", bytes);
+	}
+	struct statfs fs;
+	memset(&fs, 0, sizeof(fs));
+	int ret = statfs("/", &fs);
+	if (ret != 0) {
+		perror("statvfs(/)");
+		return ret;
+	}
+	printf(" [*] FS type: %08x\n", (int)fs.f_type);
+	printf(" [*] Free FS blocks: %lld / %lld\n",
+		(unsigned long long)fs.f_bfree,
+		(unsigned long long)fs.f_blocks);
+	printf(" [*] Free space: %lld / %lld bytes\n",
+		(unsigned long long)(fs.f_bfree*fs.f_bsize),
+		(unsigned long long)(fs.f_blocks*fs.f_bsize));
 	printf(" [*] Enclave file list:\n");
 	list_dir("/", 0);
 
 	printf(" [*] Reading test.txt using stdio\n");
-	FILE *f = fopen("/test.txt", "r");
+	f = fopen("/test.txt", "r");
 	if (f == NULL) {
 		fprintf(stderr, "Error: file /test.txt not found\n");
 		perror("fopen()");
 		return 2;
 	}
-	char buffer[20] = {0};
 	char *res2 = fgets(buffer, sizeof(buffer), f);
 	if (res2 == NULL) {
 		fprintf(stderr, "Error: fgets(/test.txt) returned NULL\n");
 		perror("fgets()");
-		return -1;
+		return 3;
 	}
 	if (strcmp("Hello, World!\n", buffer) != 0)
 		fprintf(stderr, "WARN: read wrong string from /test.txt\n");
 	printf(" [*] Read: '%s'\n", buffer);
-	int ret = fclose(f);
+	ret = fclose(f);
 	if (ret != 0) {
 		fprintf(stderr, "Error: close(/test.txt) returned %d\n", ret);
 		perror("fclose()");
 		return ret;
 	}
 
+	for (unsigned int i = 0; i < sizeof(buffer); i++)
+		buffer[i] = i;
+	f = fopen("/test_hugefile", "w");
+	if (f == NULL) {
+		perror("fopen(/test_hugefile");
+		return 4;
+	}
+	unsigned long long total_written = 0;
+	ssize_t written;
+	do {
+		written = fwrite(buffer, 1, sizeof(buffer), f);
+		total_written += written;
+	} while (written == sizeof(buffer));
+	printf(" [*] Wrote %llu bytes before error\n", total_written);
+	if (100*total_written < 90*fs.f_blocks*fs.f_bsize) {
+		fprintf(stderr, "Error: write failed before reaching 90%% of HD\n");
+		perror("fwrite()");
+		return 5;
+	}
+	fclose(f);
+	unlink("/test_hugefile");
 	return 0;
 }

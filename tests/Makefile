@@ -12,6 +12,8 @@ ${TESTS_BUILD}/%: %.c ${SGX_MUSL_CC} | ${TESTS_BUILD}
 tests: $(TESTS_OBJ)
 	@${MAKE} -j1 serial_tests
 
+tests_norun: $(TESTS_OBJ)
+
 serial_tests:
 	@printf "    [*] 01-compiler: "
 	@MUSL_NOLKL=1 ${TESTS_BUILD}/01-compiler >/dev/null; \
@@ -57,21 +59,17 @@ serial_tests:
 	@MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_TAP="" MUSL_HD="" ${TESTS_BUILD}/19-lkl-boot >/dev/null; \
 		[ $$? -eq 42 ] && echo "OK"
 	@printf "    [*] 20-lkl-disk: "
-	@MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_TAP="" MUSL_HD=${TESTS}/20-lkl-disk.img:ro ${TESTS_BUILD}/20-lkl-disk >/dev/null; \
+	@cd ${TESTS}; tar -xvf 20-lkl-disk.tar.gz >/dev/null
+	@MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_TAP="" MUSL_HD=${TESTS}/20-lkl-disk.img ${TESTS_BUILD}/20-lkl-disk >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
+	@rm -f ${TESTS}/20-lkl-disk.img
 	@printf "    [*] 21-lkl-net: "
 	@(MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_TAP=tap0 MUSL_IP4=10.0.1.1 MUSL_GW4=10.0.1.254 MUSL_MASK4=24 MUSL_HD="" \
 		${TESTS_BUILD}/21-lkl-net >/dev/null &) && (ping -W1 -c15 -i0.2 -D -O -q -n 10.0.1.1 >/dev/null); \
 		[ $$? -eq 0 ] && echo "OK"
 
-${LIBEVENT_BUILD} ${MEMCACHED_BUILD} ${NGINX_BUILD} ${TESTS_BUILD}:
-	@mkdir -p $@
 
-# Submodule initialisation (one-shot after git clone)
-${LIBEVENT}/.git ${MEMCACHED}/.git ${NGINX}/.git:
-	[ "$(FORCE_SUBMODULES_VERSION)" = "true" ] || git submodule update --init $($@:.git=)
-
-libevent: submodules ${LIBEVENT_BUILD}
+libevent: ${LIBEVENT_BUILD} | ${LIBEVENT}/.git
 	cd ${LIBEVENT}; [ -f configure ] || CC=${SGX_MUSL_CC} ./autogen.sh
 	cd ${LIBEVENT}; MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_HD="" MUSL_TAP="" CC=${SGX_MUSL_CC} ./configure \
 		--disable-shared \
@@ -89,7 +87,7 @@ libevent: submodules ${LIBEVENT_BUILD}
 	+${MAKE} -C ${LIBEVENT}
 	+${MAKE} -C ${LIBEVENT} install
 
-memcached: submodules libevent ${MEMCACHED_BUILD}
+memcached: libevent ${MEMCACHED_BUILD} | ${MEMCACHED}/.git
 	cd ${MEMCACHED}; [ -f configure ] || ./autogen.sh
 	cd ${MEMCACHED}; MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_HD="" MUSL_TAP="" CC=${SGX_MUSL_CC} ./configure \
 		--with-libevent=${LIBEVENT_BUILD} \
@@ -99,7 +97,7 @@ memcached: submodules libevent ${MEMCACHED_BUILD}
 	+${MAKE} -C ${MEMCACHED}
 	+${MAKE} -C ${MEMCACHED} install
 
-nginx: submodules ${NGINX_BUILD}
+nginx: ${NGINX_BUILD} | ${NGINX}/.git
 	cd ${NGINX}; MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_HD="" MUSL_TAP="" CC=${SGX_MUSL_CC} ./auto/configure \
 		${NGINX_CONFIGURE_OPTS} \
 		--prefix=${NGINX_BUILD}/ \
@@ -120,6 +118,13 @@ nginx: submodules ${NGINX_BUILD}
 		--with-ipv6
 	cd ${NGINX}; make
 
+# Build directories initialisation (one-shot after git clone and make clean)
+${LIBEVENT_BUILD} ${MEMCACHED_BUILD} ${NGINX_BUILD} ${TESTS_BUILD}:
+	@mkdir -p $@
+
+# Submodule initialisation (one-shot after git clone)
+${LIBEVENT}/.git ${MEMCACHED}/.git ${NGINX}/.git:
+	[ "$(FORCE_SUBMODULES_VERSION)" = "true" ] || git submodule update --init $($@:.git=)
 clean:
 	rm -f $(TESTS_OBJ)
 	${MAKE} -C ${LIBEVENT} clean || /bin/true
