@@ -1,31 +1,37 @@
+#!/usr/bin/env python3
+
 import os
 import re
 import sys
 import subprocess
 import statistics
 import json
+import csv
+from datetime import datetime
 import matplotlib.pyplot as plt
 
 # Path to IOZone's executable (run make iozone before this script)
 root_path = os.path.dirname(os.path.realpath(__file__))
 iozone_path = root_path + '/../tests/60-iozone/iozone'
 # Record sizes to test in KiB
-recordsizes = range(1, 32)
+recordsizes = range(1, 33)
 # File size in KiB (must be greater than L3 cache)
 filesize = 50*1024
 # Number of identical benchmarks to compute 30% trimmed averages
 # (must be a multiple of 3)
 repeats = 6
 
+time_start = datetime.now()
 read_results = dict()
 write_results = dict()
 for recordsize in recordsizes:
     ramsize = filesize*1024 + 20*1024*1024 # in bytes
     cmd = ("MUSL_LKLRAM=%d MUSL_VERBOSELKL=0 " + \
-        "MUSL_ETHREADS=4 MUSL_STHREADS=4 " + \
-        "%s -a -s%dk -r%dk -i0 -i2 | " + \
+        "MUSL_ETHREADS=4 MUSL_STHREADS=4 MUSL_HD=%s " + \
+        "%s -a -s%dk -f/largefile -r%dk -i0 -i2 | " + \
         "tail -n3 | head -n1 | tr -s ' ' | cut -d' ' -f5-6") % \
-        (ramsize, iozone_path, filesize, recordsize)
+        (ramsize, root_path + '/largedisk.img', iozone_path,
+         filesize, recordsize)
 
     sys.stderr.write(' [+] Starting recordsize %d\n' % recordsize)
     read_results[recordsize] = []
@@ -54,16 +60,12 @@ with open(root_path + '/raw_results.json', 'w') as raw_results:
     raw_results.truncate()
     json.dump([read_results, write_results], raw_results)
 
-if repeats >= 6:
+if repeats >= 3:
     for recordsize in recordsizes:
         read_results[recordsize] = \
             sorted(read_results[recordsize])[int(repeats/3):int(2*repeats/3)]
         write_results[recordsize] = \
             sorted(write_results[recordsize])[int(repeats/3):int(2*repeats/3)]
-
-with open(root_path + '/final_results.json', 'w') as final_results:
-    final_results.truncate()
-    json.dump([read_results, write_results], final_results)
 
 sys.stderr.write('========= Results:\n')
 read_means = dict()
@@ -82,3 +84,19 @@ for recordsize in recordsizes:
         write_means[recordsize], write_stdevs[recordsize],
         write_stdevs[recordsize]/write_means[recordsize]*100))
 
+with open(root_path + '/final_results.csv', 'w') as final_results:
+    final_results.truncate()
+    fieldnames = ['Record size','Read mean','Write mean',
+        'Read stdev','Write stdev']
+    writer = csv.DictWriter(final_results, fieldnames=fieldnames)
+    writer.writeheader()
+    for recordsize in recordsizes:
+        writer.writerow({'Record size':recordsize,
+            'Read mean': float(read_means[recordsize])/1024,
+            'Write mean': float(write_means[recordsize])/1024,
+            'Read stdev': float(read_stdevs[recordsize])/1024,
+            'Write stdev': float(write_stdevs[recordsize])/1024,
+        })
+
+sys.stderr.write('Total benchmark time: %s\n' % str(datetime.now() -
+    time_start))
