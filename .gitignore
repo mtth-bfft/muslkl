@@ -3,4 +3,5 @@ results/
 *.pyc
 tests/60-iozone/*.o
 tests/60-iozone/iozone
-
+*.csv
+*.json

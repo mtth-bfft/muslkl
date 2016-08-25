@@ -37,9 +37,10 @@ openssl ${LIBCRYPTO}: ${HOST_MUSL_CC} | ${OPENSSL}/.git ${OPENSSL_BUILD}
 		--prefix=${OPENSSL_BUILD}/ \
 		--openssldir=${OPENSSL_BUILD}/openssl/ \
 		threads no-zlib no-shared
-	+${MAKE} CC=${HOST_MUSL_CC} -C ${OPENSSL} depend
-	+${MAKE} CC=${HOST_MUSL_CC} -C ${OPENSSL}
-	+${MAKE} CC=${HOST_MUSL_CC} -C ${OPENSSL} install
+	sed -i 's/^CFLAG=/CFLAG= -fPIC /' ${OPENSSL}/Makefile
+	+CC=${HOST_MUSL_CC} ${MAKE} -C ${OPENSSL} depend
+	+CC=${HOST_MUSL_CC} ${MAKE} -C ${OPENSSL}
+	+CC=${HOST_MUSL_CC} ${MAKE} -C ${OPENSSL} install
 
 tools: ${TOOLS_OBJ}
 
@@ -73,9 +74,12 @@ ${HOST_MUSL}/.git ${LKL}/.git ${OPENSSL}/.git ${SGX_MUSL}/.git:
 
 clean:
 	rm -rf ${BUILD_DIR}
-	+${MAKE} -C ${HOST_MUSL} distclean
-	+${MAKE} -C ${SGX_MUSL} distclean
-	+${MAKE} -C ${OPENSSL} clean
-	+${MAKE} -C ${LKL} clean
-	+${MAKE} -C ${LKL}/tools/lkl clean
-	+${MAKE} -C ${TESTS} clean
+	+${MAKE} -C ${HOST_MUSL} distclean || true
+	+${MAKE} -C ${SGX_MUSL} distclean || true
+	+${MAKE} -C ${OPENSSL} clean || true
+	+${MAKE} -C ${LKL} clean || true
+	+${MAKE} -C ${LKL}/tools/lkl clean || true
+	+${MAKE} -C ${TESTS} clean || true
+	rm -f ${HOST_MUSL}/config.mak
+	rm -f ${SGX_MUSL}/config.mak
+	rm -f ${OPENSSL}/Makefile

@@ -209,34 +209,33 @@ int main(int argc, char* argv[])
 	for (sector = 0; !interrupted; sector++) {
 		int read = (int)fread(readbuf, 1, sector_size, in);
 		if (read != sector_size) {
-			if (ferror(in)) {
-				fprintf(stderr, "I/O error while reading\n");
-				res = errno;
+			if (ferror(in) || (!encrypting && read != 0)) {
+				fprintf(stderr, " [!] I/O error: %d bytes "
+					"returned, error %d\n", read, errno);
+				res = 4;
 				break;
-			} else if (encrypting) {
-				printf(" [*] Last block was %d bytes,"
+			}
+			else if (encrypting && read > 0) {
+				fprintf(stderr, " [*] Last block was %d bytes,"
 					" 0-padding to %d bytes\n", read,
 					(int)sector_size);
 				for (int i = read; i < sector_size; i++)
 					readbuf[i] = 0;
 			} else {
-				fprintf(stderr, " [!] Cannot decrypt, last "
-					"block was %d bytes long\n", read);
-				res = 4;
 				break;
 			}
 		}
-		int handled = 0;
+		int handled = sector_size;
 		res = op(readbuf, sector_size, writebuf, &handled, sector, aes_key);
 		if (res != 0 || handled != sector_size) {
-			fprintf(stderr, "%s error %d at sector %llu\n",
-				(encrypting ? "Encryption" : "Decryption"),
+			fprintf(stderr, "Error: %s code %d at sector %llu\n",
+				(encrypting ? "encryption" : "decryption"),
 				res, (unsigned long long)sector);
 			break;
 		}
 		int written = fwrite(writebuf, 1, sector_size, out);
 		if (written != sector_size) {
-			fprintf(stderr, "I/O error while writing\n");
+			fprintf(stderr, "Error: I/O failed while writing\n");
 			res = errno;
 			break;
 		}
@@ -251,7 +250,7 @@ int main(int argc, char* argv[])
 
 	unsigned long duration = time(NULL) - start;
 	fprintf(stderr, " [+] %lld bytes written in %ld seconds (%.3f MiB/s)\n",
-		(unsigned long long)((sector+1)*sector_size), duration,
+		(unsigned long long)(sector*sector_size), duration,
 		((double)sector*sector_size)/(duration*1024*1024));
 
 	if (out != stdout)
