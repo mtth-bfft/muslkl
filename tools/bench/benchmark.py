@@ -18,99 +18,119 @@ DEFAULT_CUSTOM_CMDLINE = ROOT_PATH + \
     '/build/tests/80-memcached/memcached/bin/memcached -t{appthreads} -M -u root'
 DEFAULT_BENCH_CWD = ROOT_PATH + '/../YCSB/'
 DEFAULT_BENCH_CMDLINES = [
-    ('bin/ycsb %s memcached -s -P workloads/workloada ' + \
-    '-p memcached.hosts={ip}') % cmd for cmd in ('load','run')
+    ROOT_PATH + '/../YCSB/bin/ycsb load memcached -threads 10 -s ' + \
+    '-P workloads/workload{ycsb} -p memcached.hosts={ip}',
+    ROOT_PATH + '/../YCSB/bin/ycsb run memcached -threads {clients} ' + \
+    '-s -P workloads/workload{ycsb} -p memcached.hosts={ip}',
 ]
 DEFAULT_BENCH_IP4 = '10.0.1.1'
 DEFAULT_BENCH_GW4 = '10.0.1.254'
 DEFAULT_BENCH_MASK4 = 24
 DEFAULT_BENCH_TAP = 'tap0'
 DEFAULT_BENCH_HD = ROOT_PATH + '/tests/80-memcached.img'
-DEFAULT_BENCH_TIMEOUT = 3*60 # seconds
-DEFAULT_SERVER_WAITSTART = 3 # seconds
+DEFAULT_BENCH_TIMEOUT = 20 # seconds
+DEFAULT_SERVER_WAITSTOP = 1 # seconds
 
 class Benchmark():
-    TYPE_VANILLA = 1
-    TYPE_LKL = 2
+    TYPE_VANILLA = "Host kernel"
+    TYPE_LKL = "LKL kernel"
 
-    def __init__(self, type, ethreads, sthreads,
-                 espins, esleepns, appthreads,
-                 srv_cmdline=None,
-                 bench_cmdlines=DEFAULT_BENCH_CMDLINES,
-                 bench_timeout=DEFAULT_BENCH_TIMEOUT):
+    def __init__(self, type, ethreads=2, sthreads=100, clients=1,
+                 espins=500, esleep=16000, sspins=100, ssleep=4000,
+                 appthreads=2, ycsb='a', slots=256,
+                 kernel=True):
         self.type = type
+        self.ycsb = ycsb
+        self.kernel = kernel
         self.ethreads = ethreads
         self.sthreads = sthreads
         self.espins = espins
-        self.esleepns = esleepns
+        self.esleep = esleep
+        self.sspins = sspins
+        self.ssleep = ssleep
         self.appthreads = appthreads
+        self.clients = clients
         self.srv_pid = None
         self.srv_out = ''
-        self.bench_cmdlines = bench_cmdlines
-        self.bench_timeout = bench_timeout
         if type == Benchmark.TYPE_VANILLA:
             self.bench_ip4 = '127.0.0.1'
         else:
             self.bench_ip4 = DEFAULT_BENCH_IP4
-        if srv_cmdline is None:
-            if type == Benchmark.TYPE_VANILLA:
-                self.srv_cmdline = DEFAULT_VANILLA_CMDLINE
-            elif type == Benchmark.TYPE_LKL:
-                self.srv_cmdline = DEFAULT_CUSTOM_CMDLINE
-            else:
-                raise ValueError("Unknown benchmark type")
+        self.bench_timeout = DEFAULT_BENCH_TIMEOUT
+        self.bench_cmdlines = [
+            cmd.format(
+                ip = self.bench_ip4,
+                ycsb = self.ycsb,
+                clients = self.clients,
+            ) for cmd in DEFAULT_BENCH_CMDLINES
+        ]
+
+        if type == Benchmark.TYPE_VANILLA:
+            self.srv_cmdline = DEFAULT_VANILLA_CMDLINE
+        elif type == Benchmark.TYPE_LKL:
+            self.srv_cmdline = DEFAULT_CUSTOM_CMDLINE
         else:
-            self.srv_cmdline = srv_cmdline
+            raise ValueError("Unknown benchmark type")
         self.srv_cmdline = self.srv_cmdline.format(
             appthreads=self.appthreads,
-            ethreads=self.ethreads,
-            sthreads=self.sthreads,
-            espins=self.espins,
-            esleepns=self.esleepns,
         )
 
     def server_thread(self):
         srv_env = os.environ.copy()
+        srv_env["MUSL_RTPRIO"] = 1
+        srv_env["MUSL_KERNEL"] = 1 if self.kernel else 0
         srv_env["MUSL_ETHREADS"] = self.ethreads
         srv_env["MUSL_STHREADS"] = self.sthreads
         srv_env["MUSL_ESPINS"] = self.espins
-        srv_env["MUSL_ESLEEP"] = self.esleepns
+        srv_env["MUSL_ESLEEP"] = self.esleep
+        srv_env["MUSL_SSPINS"] = self.sspins
+        srv_env["MUSL_SSLEEP"] = self.ssleep
         srv_env["MUSL_NOLKL"] = 0
-        srv_env["MUSL_VERBOSELKL"] = 1
+        srv_env["MUSL_VERBOSELKL"] = 0
         srv_env["MUSL_HD"] = DEFAULT_BENCH_HD
         srv_env["MUSL_TAP"] = DEFAULT_BENCH_TAP
         srv_env["MUSL_IP4"] = DEFAULT_BENCH_IP4
         srv_env["MUSL_GW4"] = DEFAULT_BENCH_GW4
         srv_env["MUSL_MASK4"] = DEFAULT_BENCH_MASK4
         srv_env = { k : str(v) for (k,v) in srv_env.items() }
-        cmdline = self.srv_cmdline.format(
-            appthreads=self.appthreads,
-        )
         self.srv_out = ''
         srv_proc = None
+        err = None
+        print(' [*] Starting server ' + self.srv_cmdline)
         try:
-            srv_proc = subprocess.Popen(cmdline.split(),
+            srv_proc = subprocess.Popen(self.srv_cmdline.split(),
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 universal_newlines=True, start_new_session=True,
                 env=srv_env)
             self.srv_pid = srv_proc.pid
             self.srv_out = srv_proc.communicate()[0]
         except Exception as e:
+            err = e
+        if err is not None:
             raise RuntimeError(
                 ("Benchmarked server died: %s %s\n" +\
-                "====\n%s") % (str(type(e)), str(e), self.srv_out)
-            )
-        finally:
-            if srv_proc is not None and srv_proc.poll() is None:
-                self.stop_server()
+                "====\n%s") % (str(type(e)), str(e), self.srv_out))
+        if not self.killed:
+            raise RuntimeError(
+                ("Benchmark server exited with code %d before " + \
+                "the end:\n====\n%s") % (int(srv_proc.poll()),
+                self.srv_out))
+        print(' [*] Server killed normally')
 
     def start_server(self):
+        self.killed = False
         srv_thread = threading.Thread(target=self.server_thread)
         srv_thread.start()
 
     def stop_server(self):
-        if self.srv_pid is not None:
+        if not self.killed and self.srv_pid is not None:
+            print(' [*] Killing server')
+            self.killed = True
             os.killpg(self.srv_pid, signal.SIGINT)
+            self.srv_pid = None
+        else:
+            print(' [*] Server already killed')
+        time.sleep(DEFAULT_SERVER_WAITSTOP)
 
     def parse_output(self, out):
         def extract(var, txt):
@@ -136,18 +156,19 @@ class Benchmark():
         self.update_latency_min = extract('update.*min.*latency', run)
         self.update_latency_max = extract('update.*max.*latency', run)
         self.update_latency_95 = extract('update.*95.*latency', run)
-        self.throughput = (self.load_throughput + self.run_throughput)/2
+        self.throughput = self.run_throughput
+        self.latency = (self.read_latency_avg + self.update_latency_avg)/2
 
     def run(self):
         self.start_time = time.time()
         output, cmdline = '', ''
         # This part of the code cannot use Popen(timeout) because
-        # it waits indefinitely for child processes to die.
+        # it waits indefinitely for subprocesses to die.
         proc = None
         try:
             self.start_server()
             for cmdline in self.bench_cmdlines:
-                cmdline = cmdline.format(ip=self.bench_ip4)
+                print(' [*] Running benchmark cmd: ' + cmdline)
                 proc = subprocess.Popen(cmdline.split(),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT, universal_newlines=True,
@@ -157,7 +178,7 @@ class Benchmark():
             os.killpg(proc.pid, signal.SIGKILL)
             output += proc.communicate()[0]
             raise RuntimeError(
-                "Benchmark timed out:\n%s\n%s" % (cmdline, output)
+                "Benchmark cmd timed out:\n%s\n%s" % (cmdline, output)
             )
         except Exception as e:
             if proc is not None and proc.poll() is None:
@@ -168,10 +189,12 @@ class Benchmark():
                 ret = proc.poll()
                 output += proc.communicate()[0]
             raise RuntimeError(
-                ("Benchmark exited with code %d:\n" + \
+                ("Benchmark cmd exited with code %d:\n" + \
                 "=========\n%s") % (int(ret), output))
         finally:
             self.stop_server()
+            if proc is not None and proc.poll() is None:
+                os.killpg(proc.pid, signal.SIGKILL)
         try:
             self.parse_output(output)
         except Exception as e:
@@ -184,5 +207,4 @@ class Benchmark():
             )
         self.stop_time = time.time()
         self.elapsed_time = self.stop_time - self.start_time
-
 
