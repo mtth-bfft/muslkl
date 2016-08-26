@@ -11,7 +11,7 @@ import statistics
 from collections import OrderedDict
 
 test_duration = 20
-test_repeats = 3
+test_repeats = 5
 
 tools_dir = os.path.dirname(os.path.realpath(__file__))
 tool_path = tools_dir + '/../build/tools/disk_encrypt'
@@ -42,16 +42,18 @@ def get_bench_results(cmd):
     return (statistics.mean(results), statistics.stdev(results))
 
 if __name__ == '__main__':
-    sys.stdout.write(' '*20 + '    Encryption    |    Decryption\n')
+    sys.stdout.write(' '*20 + '        Encryption        |          Decryption\n')
     for name, cmd in commands.items():
         cmd += ' -o /dev/null'
         cmd += ' -k0102030405060708091011121314151617181920212223242526272829303132'
         sys.stdout.write(name.rjust(20) + ' ')
         sys.stdout.flush()
         mean, stdev = get_bench_results(cmd + ' -e')
-        sys.stdout.write('{:9.4f} MiB/s  '.format(float(mean)/(1024*1024)))
+        sys.stdout.write('{:9.4f} MiB/s ({:.2f} %)  '.format(
+            float(mean)/(1024*1024), float(stdev)/mean*100))
         sys.stdout.flush()
         mean, stdev = get_bench_results(cmd + ' -e')
-        sys.stdout.write('{:9.4f} MiB/s'.format(float(mean)/(1024*1024)))
-        sys.stdout.write('    (~{:.2f} %)\n'.format(stdev/mean*100))
+        sys.stdout.write('{:9.4f} MiB/s ({:.2f} %)'.format(
+            float(mean)/(1024*1024), float(stdev)/mean*100))
+        print('')
 

@@ -72,27 +72,21 @@ int blockdev_decrypt(unsigned char *cipher_buf, int cipher_len,
 	unsigned char key[])
 {
 	aes_iv_plain64 iv;
-	EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+	EVP_CIPHER_CTX ctx;
 	int res = 1;
 	int plain_len = 0;
-
-	if (ctx == NULL) {
-		perror("EVP_CIPHER_CTX_new()");
-		res = 1;
-		goto out;
-	}
 
 	memset(&iv, 0, sizeof(iv));
 	iv.sector.index = htole64(sector);
 
-	EVP_OR_GOTO_OUT(EVP_DecryptInit(ctx, EVP_aes_128_xts(), key, iv.aes_iv))
-	EVP_OR_GOTO_OUT(EVP_DecryptUpdate(ctx, plain_buf, &plain_len, cipher_buf, cipher_len))
+	EVP_OR_GOTO_OUT(EVP_DecryptInit(&ctx, EVP_aes_128_xts(), key, iv.aes_iv))
+	EVP_OR_GOTO_OUT(EVP_DecryptUpdate(&ctx, plain_buf, &plain_len, cipher_buf, cipher_len))
 	int plain_len_added = 0;
-	EVP_OR_GOTO_OUT(EVP_DecryptFinal(ctx, plain_buf + plain_len, &plain_len_added))
+	EVP_OR_GOTO_OUT(EVP_DecryptFinal(&ctx, plain_buf + plain_len, &plain_len_added))
 	plain_len += plain_len_added;
 
 out:
-	EVP_CIPHER_CTX_free(ctx);
+	EVP_CIPHER_CTX_cleanup(&ctx);
 	if (res == 1)
 		*_plain_len = plain_len;
 	return (res != 1);
