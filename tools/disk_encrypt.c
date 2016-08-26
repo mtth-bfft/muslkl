@@ -61,6 +61,7 @@ int blockdev_encrypt(unsigned char *plain_buf, int plain_len,
 	cipher_len += cipher_len_added;
 
 out:
+	EVP_CIPHER_CTX_free(ctx);
 	if (res == 1)
 		*_cipher_len = cipher_len;
 	return (res != 1);
@@ -91,6 +92,7 @@ int blockdev_decrypt(unsigned char *cipher_buf, int cipher_len,
 	plain_len += plain_len_added;
 
 out:
+	EVP_CIPHER_CTX_free(ctx);
 	if (res == 1)
 		*_plain_len = plain_len;
 	return (res != 1);
