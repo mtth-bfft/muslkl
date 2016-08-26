@@ -21,6 +21,7 @@ MEMCACHED ?= ${TESTS}/80-memcached/memcached
 MEMCACHED_BUILD ?= ${TESTS_BUILD}/80-memcached/memcached
 NGINX ?= ${TESTS}/70-nginx
 NGINX_BUILD ?= ${TESTS_BUILD}/70-nginx
+IOZONE ?= ${TESTS}/60-iozone
 TOOLS ?= ${ROOT_DIR}/tools
 TOOLS_BUILD ?= $(BUILD_DIR)/tools
 TOOLS_SRC ?= $(wildcard $(TOOLS)/*.c)

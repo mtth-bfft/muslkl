@@ -3,7 +3,7 @@ include ../config.mak
 .PHONY: default all tests memcached nginx clean
 
 default: tests
-all: tests memcached nginx
+all: tests iozone memcached nginx
 
 ${TESTS_BUILD}/%: %.c ${SGX_MUSL_CC} | ${TESTS_BUILD}
 	${SGX_MUSL_CC} ${MY_CFLAGS} -o $@ $< ${MY_LDFLAGS}
@@ -73,6 +73,10 @@ serial_tests:
 		${TESTS_BUILD}/21-lkl-net >/dev/null &) && (ping -W1 -c15 -i0.2 -D -O -q -n 10.0.1.1 >/dev/null); \
 		[ $$? -eq 0 ] && echo "OK"
 
+iozone:
+	+${MAKE} -C ${IOZONE} CC=${SGX_MUSL_CC} CFLAGS="-DHAVE_PREADV -DHAVE_PWRITEV" openbsd-threads
+# Using openbsd-threads instead of linux is just a trick to disable aio async read/writes, not supported in sgx-musl.
+
 libevent: ${LIBEVENT_BUILD} | ${LIBEVENT}/.git
 	cd ${LIBEVENT}; [ -f configure ] || CC=${SGX_MUSL_CC} ./autogen.sh
 	cd ${LIBEVENT}; MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_HD="" MUSL_TAP="" CC=${SGX_MUSL_CC} ./configure \
@@ -131,6 +135,7 @@ ${LIBEVENT}/.git ${MEMCACHED}/.git ${NGINX}/.git:
 	[ "$(FORCE_SUBMODULES_VERSION)" = "true" ] || git submodule update --init $($@:.git=)
 clean:
 	rm -f $(TESTS_OBJ)
+	${MAKE} -C ${IOZONE} clean
 	${MAKE} -C ${LIBEVENT} clean || /bin/true
 	rm -f ${LIBEVENT}/Makefile
 	rm -f ${LIBEVENT}/configure

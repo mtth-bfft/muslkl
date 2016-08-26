@@ -3,7 +3,18 @@
 from datetime import timedelta
 
 def pretty_print_duration(secs):
-        return str(timedelta(seconds=secs))
+    if type(secs) is timedelta:
+        return str(secs)
+    else:
+        return str(timedelta(seconds=int(secs)))
+
+def pretty_print_size(bytes):
+    prefixes = ['B','KiB','MiB','GiB']
+    prefix = 0
+    while bytes > 1024 and prefix < len(prefixes):
+        bytes /= 1024
+        prefix += 1
+    return str(bytes) + prefixes[prefix]
 
 def range_custom(a, b, step="+1"):
     val = a
