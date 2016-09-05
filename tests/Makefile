@@ -18,11 +18,11 @@ serial_tests:
 	@printf "    [*] 01-compiler: "
 	@MUSL_NOLKL=1 ${TESTS_BUILD}/01-compiler >/dev/null; \
 		[ $$? -eq 42 ] && echo "OK"
-	@printf "    [*] 02-pthreads: "
-	@MUSL_NOLKL=1 ${MUSLKLSGX_STD_RUN_OPTS} ${TESTS_BUILD}/02-pthreads >/dev/null; \
+	@printf "    [*] 02-sleep: "
+	@MUSL_NOLKL=1 ${MUSLKLSGX_STD_RUN_OPTS} ${TESTS_BUILD}/02-sleep >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
-	@printf "    [*] 03-pthreads-sleep: "
-	@MUSL_NOLKL=1 ${TESTS_BUILD}/03-pthreads-sleep >/dev/null; \
+	@printf "    [*] 03-pthreads: "
+	@MUSL_NOLKL=1 ${MUSLKLSGX_STD_RUN_OPTS} ${TESTS_BUILD}/03-pthreads >/dev/null; \
 		[ $$? -eq 0 ] && echo "OK"
 #	@printf "    [*] 04-lthreads-sleep: "
 #	@MUSL_NOLKL=1 ${MUSLKLSGX_STD_RUN_OPTS} ${TESTS_BUILD}/04-lthreads-sleep; \

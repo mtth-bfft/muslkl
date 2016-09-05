@@ -49,7 +49,8 @@ void* secondary_exit(void *arg) {
 	check_state(3);
 
 	pthread_exit(RETVAL);
-	// Should never be executed
+	// Should never be executed, but frankenlibc's POSIX thread emulation
+	// did let this return...
 	return INVALID_RETVAL;
 }
 
@@ -81,8 +82,6 @@ void* secondary_detach(void *arg) {
 		exit(res);
 	}
 
-	// Signal the main thread that this test has succeeded and it can move on
-	busy_wait_join_detached = 1;
 	printf("Secondary detached thread alive\n");
 	pthread_exit(RETVAL);
 	// Should never be executed
@@ -147,11 +146,6 @@ int main() {
 		fprintf(stderr, "Error: pthread_create() returned %d\n", res);
 		return res;
 	}
-	// Emulate a pthread_join on detached thread
-	while (!busy_wait_join_detached) {
-		printf(".");
-	}
-	printf("\n");
 
 	// Check pthread_cancel() + pthread_join()
 	pthread_t thread4;

@@ -13,20 +13,23 @@
 static unsigned int key1 = 0;
 static unsigned int key2 = 0;
 
+volatile int join_busy_wait = 0;
+
 void secondary(void* arg) {
 	UNUSED(arg);
 	int res = lkl_host_ops.tls_set(key1, VAL1_2);
 	if (res != 0) {
-		fprintf(stderr, "Failed tls_set() in secondary thread, code %d\n",
-			res);
+		fprintf(stderr, "Failed tls_set() in secondary thread, "
+			"code %d\n", res);
 		exit(res);
 	}
-	arg = lkl_host_ops.tls_get(key2);
+	arg = lkl_host_ops.tls_get(key1);
 	if (arg != VAL1_2) {
-		fprintf(stderr, "WARN: tls_get(%u) returned %p in thread 2 ",
-			key2, arg);
-		exit(2);
+		fprintf(stderr, "Incorrect tls_get in secondary thread: %p\n",
+			arg);
+		exit(8);
 	}
+	join_busy_wait = 1;
 }
 
 int main() {
@@ -41,8 +44,10 @@ int main() {
 		fprintf(stderr, "Failed second tls_alloc, returned %d\n", res);
 		return res;
 	}
-	if (key1 == key2)
+	if (key1 == key2) {
 		fprintf(stderr, "WARN: broken tls_alloc(), only 1 key %u ", key1);
+		return 1;
+	}
 
 	// Check tls_set and tls_get in the same thread
 	res = lkl_host_ops.tls_set(key1, VAL1_1);
@@ -53,8 +58,10 @@ int main() {
 	void *val = lkl_host_ops.tls_get(key1);
 	if (val != VAL1_1) {
 		fprintf(stderr, "Incorrect first tls_get result: %p\n", val);
-		return 1;
+		return 2;
 	}
+	// (frankenlibc's pseudo-TLS failed to maintain two variables at
+	// the same time)
 	res = lkl_host_ops.tls_set(key2, VAL2_1);
 	if (res != 0) {
 		fprintf(stderr, "Second tls_set failed, returned %d\n", res);
@@ -63,20 +70,28 @@ int main() {
 	val = lkl_host_ops.tls_get(key2);
 	if (val != VAL2_1) {
 		fprintf(stderr, "Incorrect second tls_get result: %p\n", val);
-		return 2;
+		return 3;
 	}
 
 	// Check tls_get/set in multiple threads
 	lkl_thread_t thread = lkl_host_ops.thread_create(&secondary, NULL);
 	if (thread == 0) {
 		fprintf(stderr, "Failed to thread_create\n");
-		return 3;
+		return 4;
+	}
+
+	while (join_busy_wait == 0) {
+		volatile int i = 0;
+		for (i = 0; i < 1000000; i++) { }
+		// We have to keep emitting syscalls while busy waiting
+		// to avoid starving the secondary thread (userland scheduling...)
+		printf(".");
 	}
 
 	val = lkl_host_ops.tls_get(key1);
 	if (val != VAL1_1) {
 		fprintf(stderr, "TLS value modified by another thread\n");
-		return 4;
+		return 5;
 	}
 
 	// Check tls_free

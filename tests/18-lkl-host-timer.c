@@ -10,7 +10,7 @@
 #define TIMER_INTERVAL_NS 1000*1000UL
 
 // lthread has millisecond accuracy at best
-#define SLEEP_DRIFT_ALLOWED_NS (1000*1000)
+#define SLEEP_DRIFT_ALLOWED_NS (2*1000*1000)
 
 static unsigned int timer_nums[NUM_TIMERS] = { 0 };
 static unsigned long long timer_fire_count[NUM_TIMERS] = { 0 };

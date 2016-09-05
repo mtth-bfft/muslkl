@@ -10,7 +10,8 @@ from bench.utils import pretty_print_size, pretty_print_duration
 from datetime import datetime
 import matplotlib.pyplot as plt
 
-# Path to IOZone's executable (run make iozone before this script)
+# Installation paths and test encryption keys
+syscalldrv_path = '/dev/syscall0'
 root_path = os.path.dirname(os.path.realpath(__file__))
 iozone_path = root_path + '/../tests/60-iozone/iozone'
 encrypt_tool_path = root_path + '/../build/tools/disk_encrypt'
@@ -22,12 +23,19 @@ def flush_caches():
         return
     os.system('echo 3 >/proc/sys/vm/drop_caches')
 
+# Detect binaries compiled with heavy debug options
+def is_debug_executable(path):
+    res = subprocess.check_output(['strings', path], shell=False,
+            universal_newlines=True, stderr=subprocess.PIPE)
+    match = re.search(r'^musl.*debug', res, flags=re.MULTILINE|re.IGNORECASE)
+    return (match is not None)
+
 def total_ram_bytes():
     return os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
 
 class IOZoneBenchmark(object):
 
-    def __init__(self, kernel=True, recordsizes=range(1,33),
+    def __init__(self, root=True, kernel=True, recordsizes=range(1,33),
         repeats=5, max_rsd=0.10, ethreads=4, sthreads=100,
         espins=200, esleep=14000, sspins=100, ssleep=8000):
 
@@ -35,6 +43,7 @@ class IOZoneBenchmark(object):
         self.repeats = repeats
         self.max_rsd = max_rsd
         self.kernel = kernel
+        self.root = root
         self.ethreads = ethreads
         self.sthreads = sthreads
         self.espins = espins
@@ -42,6 +51,12 @@ class IOZoneBenchmark(object):
         self.sspins = sspins
         self.ssleep = ssleep
         self.disk_path = ''
+        if not os.path.exists(iozone_path):
+            raise RuntimeError("Benchmark executable not found. " + \
+                "Please run 'make -C tests iozone' before this script.")
+        if is_debug_executable(iozone_path):
+            raise RuntimeError("Will not run benchmarks on executable" +\
+                " compiled with DEBUG option");
         self.iozone_cmd = iozone_path + ' -a -s{filesizek}k ' + \
             '-r{recordsizek}k -i0 -i2'
         self.ramsize = 20*1024*1024
@@ -50,13 +65,17 @@ class IOZoneBenchmark(object):
         self.time_start = datetime.now()
         self.results = dict()
         self.env = os.environ.copy()
-        if self.kernel:
+        self.env["MUSL_KERNEL"] = 0
+        self.env["MUSL_RTPRIO"] = 0
+        if self.root:
             if os.geteuid() != 0:
                 raise RuntimeError("Must be run as root to use MUSL_KERNEL")
-            self.env["MUSL_KERNEL"] = 1
             self.env["MUSL_RTPRIO"] = 1
-        else:
-            self.env["MUSL_KERNEL"] = 0
+            self.iozone_cmd = 'nice -n -25 ' + self.iozone_cmd
+        if self.kernel:
+            if not os.path.exists(syscalldrv_path):
+                raise RuntimeError("Please install a syscall driver")
+            self.env["MUSL_KERNEL"] = 1
         self.env["MUSL_ETHREADS"] = self.ethreads
         self.env["MUSL_STHREADS"] = self.sthreads
         self.env["MUSL_ESPINS"] = self.espins
@@ -137,10 +156,11 @@ class IOZoneTMPFSBenchmark(IOZoneBenchmark):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.file_size = 100*1024*1024
+        self.file_size = 1024*1024*1024
         self.ramsize += self.file_size
-        self.results_path = 'iozone_results_tmpfs_%s_%s_%dsamples.csv' %\
+        self.results_path = 'iozone_results_tmpfs_%s_%s_%s_%dsamples.csv' %\
             ("kernel" if self.kernel else "nokernel",
+            "root" if self.root else "noroot",
             pretty_print_size(self.file_size), self.repeats)
 
 class IOZonePlainBenchmark(IOZoneBenchmark):
@@ -151,8 +171,9 @@ class IOZonePlainBenchmark(IOZoneBenchmark):
         self.disk_size = int((total_ram_bytes() * 2)/1024)*1024
         self.file_size = 1024*1024*1024
         self.disk_path = root_path + '/test_disk_plain.img'
-        self.results_path = 'iozone_results_plain_%s_%s_%dsamples.csv' %\
+        self.results_path = 'iozone_results_plain_%s_%s_%s_%dsamples.csv' %\
             ("kernel" if self.kernel else "nokernel",
+            "root" if self.root else "noroot",
             pretty_print_size(self.file_size), self.repeats)
         size = 0
         if os.path.isfile(self.disk_path):
@@ -182,8 +203,9 @@ class IOZoneEncryptionBenchmark(IOZoneBenchmark):
         self.disk_size = int((total_ram_bytes() * 2)/1024)*1024
         self.file_size = 1024*1024*1024
         self.disk_path = root_path + '/test_disk_encrypted.img'
-        self.results_path = 'iozone_results_crypt_%s_%s_%dsamples.csv' %\
+        self.results_path = 'iozone_results_crypt_%s_%s_%s_%dsamples.csv' %\
             ("kernel" if self.kernel else "nokernel",
+            "root" if self.root else "noroot",
             pretty_print_size(self.file_size), self.repeats)
         size = 0
         if os.path.isfile(self.disk_path):
@@ -211,7 +233,7 @@ class IOZoneEncryptionBenchmark(IOZoneBenchmark):
                     str(e) + '\n=====\n' + str(e.output))
 
 if __name__ == '__main__':
-    bench = IOZoneEncryptionBenchmark(repeats=5, recordsizes=range(1,40))
+    bench = IOZonePlainBenchmark(repeats=5, recordsizes=range(1,49))
     bench.run()
     sys.stdout.write(' [*] Benchmark completed, total time %s\n' %
         pretty_print_duration(bench.time_elapsed))

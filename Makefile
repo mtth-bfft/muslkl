@@ -15,7 +15,7 @@ host-musl ${HOST_MUSL_CC}: | ${HOST_MUSL}/.git ${HOST_MUSL_BUILD}
 		$(MUSL_CONFIGURE_OPTS) \
 		--prefix=${HOST_MUSL_BUILD} \
 		--disable-shared
-	+${MAKE} -C ${HOST_MUSL} install
+	+${MAKE} -C ${HOST_MUSL} CFLAGS="$(MUSL_CFLAGS)" install
 	ln -fs ${LINUX_HEADERS_INC}/linux/ ${HOST_MUSL_BUILD}/include/
 	ln -fs ${LINUX_HEADERS_INC}/asm/ ${HOST_MUSL_BUILD}/include/
 	ln -fs ${LINUX_HEADERS_INC}/asm-generic/ ${HOST_MUSL_BUILD}/include/
@@ -62,7 +62,7 @@ sgx-musl ${SGX_MUSL_CC}: ${LIBLKL} ${LIBCRYPTO} ${LKL_SGXMUSL_HEADERS} | ${SGX_M
 		--opensslheaderdir=${OPENSSL_BUILD}/include/ \
 		--openssllib=${LIBCRYPTO} \
 		--disable-shared
-	+${MAKE} -C ${SGX_MUSL} install
+	+${MAKE} -C ${SGX_MUSL} CFLAGS="$(MUSL_CFLAGS)" install
 
 # Build directories (one-shot after git clone or clean)
 ${BUILD_DIR} ${TOOLS_BUILD} ${LKL_BUILD} ${HOST_MUSL_BUILD} ${SGX_MUSL_BUILD} ${OPENSSL_BUILD}:
