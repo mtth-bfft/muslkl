@@ -121,7 +121,7 @@ class IOZoneBenchmark(object):
                     errors += 1
                     if errors >= self.repeats:
                         raise
-                    sys.stderr.write(' [!] Iteration %d/%d failed:\n%s\n%s' %
+                    sys.stderr.write(' [!] Iteration %d/%d failed:\n%s\n%s\n' %
                         (iteration, self.repeats, str(e), str(e.output)))
             read_mean = statistics.mean(read_results)
             write_mean = statistics.mean(write_results)
