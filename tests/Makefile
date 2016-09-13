@@ -27,6 +27,9 @@ serial_tests:
 #	@printf "    [*] 04-lthreads-sleep: "
 #	@MUSL_NOLKL=1 ${MUSLKLSGX_STD_RUN_OPTS} ${TESTS_BUILD}/04-lthreads-sleep; \
 #		[ $$? -eq 0 ] && echo "OK"
+	@printf "    [*] 05-devrandom: "
+	@MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} ${TESTS_BUILD}/05-devrandom >/dev/null; \
+		[ $$? -eq 0 ] && echo "OK"
 	@printf "    [*] 10-lkl-host-print: "
 	@MUSL_NOLKL=1 ${TESTS_BUILD}/10-lkl-host-print 2>&1 | grep -qi ok; \
 		[ $$? -eq 0 ] && echo "OK"
@@ -106,7 +109,7 @@ memcached: libevent ${MEMCACHED_BUILD} | ${MEMCACHED}/.git
 	+${MAKE} -C ${MEMCACHED} install
 
 nginx: ${NGINX_BUILD} | ${NGINX}/.git
-	cd ${NGINX}; MUSL_NOLKL=0 ${MUSLKLSGX_STD_RUN_OPTS} MUSL_HD="" MUSL_TAP="" CC=${SGX_MUSL_CC} ./auto/configure \
+	cd ${NGINX}; ${MUSLKLSGX_STD_RUN_OPTS} MUSL_HD="" MUSL_TAP="" CC=${SGX_MUSL_CC} ./auto/configure \
 		${NGINX_CONFIGURE_OPTS} \
 		--prefix=${NGINX_BUILD}/ \
 		--conf-path=/data/conf/nginx.conf \
@@ -123,8 +126,11 @@ nginx: ${NGINX_BUILD} | ${NGINX}/.git
 		--http-scgi-temp-path=/tmp/scgi \
 		--without-http_gzip_module \
 		--without-http_rewrite_module \
-		--with-ipv6
-	cd ${NGINX}; make
+		--with-ipv6 \
+		--with-http_ssl_module \
+		--with-openssl=${OPENSSL} \
+		--with-cc="${SGX_MUSL_CC}"
+	cd ${NGINX}; ${MUSLKLSGX_STD_RUN_OPTS} MUSL_HD="" MUSL_TAP="" CC=${SGX_MUSL_CC} make
 
 # Build directories initialisation (one-shot after git clone and make clean)
 ${LIBEVENT_BUILD} ${MEMCACHED_BUILD} ${NGINX_BUILD} ${TESTS_BUILD}:

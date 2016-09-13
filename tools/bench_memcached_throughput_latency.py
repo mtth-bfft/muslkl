@@ -9,7 +9,7 @@ import csv
 from bench.benchmark import Benchmark
 from bench.utils import parse_timedelta, pretty_print_duration
 
-def bench_throughput_latency(samples=3, max_rsd=0.06,
+def bench_throughput_latency(samples=3, max_rsd=0.1,
                              *args, **kwargs):
     while True:
         throughputs = []
